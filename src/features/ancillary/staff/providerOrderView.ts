@@ -38,6 +38,9 @@ export type ProviderOrderVisitView = {
 	title: string
 	sub: string
 	isToday: boolean
+	/** When she took it (ISO), and how the visit ended (the backend's end_reason) when it has. */
+	acceptedAt?: string | null
+	endReason?: string | null
 }
 
 export type ProviderOrderView = {
@@ -94,6 +97,8 @@ export const normalizeProviderOrder = (raw: RawProviderOrder): ProviderOrderView
 					startTime: v.start_time,
 					endTime: v.end_time,
 					status: v.status || status,
+					acceptedAt: v.accepted_at ?? null,
+					endReason: v.end_reason ?? null,
 				}))
 			: raw.scheduled_date
 				? [

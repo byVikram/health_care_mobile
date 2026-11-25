@@ -28,10 +28,16 @@ import Toast from 'react-native-toast-message'
 import { APP_COLORS, CARD_SHADOW, TONES } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import type { AncillaryServiceMatchingParams } from '../../../navigation/types'
-import { AppButton, AppFooterBar, AppNumberedSteps } from '../../../components/common'
+import {
+	AppButton,
+	AppFooterBar,
+	AppNumberedSteps,
+	cancelErrorMessage,
+	type AppCancelResult,
+} from '../../../components/common'
 import { fetchPatientActiveRequestBackend, cancelCareRequestPatientBackend } from '../ancillaryService'
 import { searchAncillaryRequestAgain, setAncillaryRequestTip } from '../ancillaryProviderBookingService'
-import ApiService, { showStatusModal } from '../../../services/apiService'
+import ApiService from '../../../services/apiService'
 import { openAuthedSocket, type AuthedSocketHandle } from '../../../utils/authedSocket'
 import { API_ENDPOINTS } from '../../../constants/apiUrls'
 import CancellationDetailsModal from './CancellationDetailsModal'
@@ -289,21 +295,12 @@ export default function ServiceMatchingPage() {
 		return () => subscription.remove()
 	}, [navigation, routeParams])
 
-	const handleCancelRequestWithReason = async (reason: string) => {
-		setIsCancelling(true)
+	const handleCancelRequestWithReason = async (reason: string): Promise<AppCancelResult> => {
 		try {
 			await cancelCareRequestPatientBackend(bookingId, reason)
-			setCancelModalVisible(false)
-			navigation.navigate(ROUTES.MAIN.TABS)
-		} catch {
-			showStatusModal({
-				status: 'error',
-				title: 'Could not cancel the request',
-				description: 'Please try again.',
-				submitText: 'OK',
-			})
-		} finally {
-			setIsCancelling(false)
+			return { ok: true }
+		} catch (e) {
+			return { ok: false, error: cancelErrorMessage(e, 'Please try again.') }
 		}
 	}
 
@@ -699,7 +696,10 @@ export default function ServiceMatchingPage() {
 				visible={cancelModalVisible}
 				onClose={() => setCancelModalVisible(false)}
 				onConfirmCancel={handleCancelRequestWithReason}
-				isCancelling={isCancelling}
+				onDone={() => {
+					setCancelModalVisible(false)
+					navigation.navigate(ROUTES.MAIN.TABS)
+				}}
 			/>
 		</View>
 	)

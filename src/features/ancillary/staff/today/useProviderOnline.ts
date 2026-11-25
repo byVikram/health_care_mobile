@@ -77,11 +77,11 @@ export function useProviderOnline({ onWentOffline }: { onWentOffline: () => void
 		return () => sub.remove()
 	}, [refreshLocation])
 
-	const setOnline = async (next: boolean) => {
-		if (busy || onlineRef.current === null || onlineRef.current === next) return
+	const setOnline = async (next: boolean): Promise<boolean> => {
+		if (busy || onlineRef.current === null || onlineRef.current === next) return false
 		const previous = onlineRef.current
 		// Going online needs location + notifications: missing ones open "Before you go online" first.
-		if (next && !(await ensureGoOnlinePermissions())) return
+		if (next && !(await ensureGoOnlinePermissions())) return false
 		setBusy(true)
 		apply(next)
 		try {
@@ -93,6 +93,7 @@ export function useProviderOnline({ onWentOffline }: { onWentOffline: () => void
 				await setProviderOnline(false)
 				offlineCb.current()
 			}
+			return true
 		} catch (e) {
 			apply(previous)
 			showStatusModal({
@@ -103,6 +104,7 @@ export function useProviderOnline({ onWentOffline }: { onWentOffline: () => void
 						: extractApiErrorMessage(e, 'Please check your connection and try again.'),
 				submitText: 'OK',
 			})
+			return false
 		} finally {
 			setBusy(false)
 		}

@@ -2,8 +2,8 @@
 //
 // The sheets of the Booking requests page, from the "Doctor Dashboard NEW" design:
 //   RequestActionsSheet   the card's three-dots menu: Accept / Ask to reschedule / Refer to another doctor / Decline
-//   DeclineRequestSheet   "Decline request": a reason (one of them is "Refer to another doctor", which carries on to the refer
-//                         sheet), an optional note, the red Decline request button
+//   DeclineRequestSheet   "Decline request" on the shared AppCancelSheet: a reason (one of them is "Refer to another doctor", which
+//                         carries on to the refer sheet), an optional note, the red Decline request button
 //   ReferDoctorSheet      "Refer to another doctor": search, speciality chips, the doctors, a note for the doctor, Refer to Dr ...
 // "Ask for another time" is the shared AskPatientRescheduleSheet in its `request` variant.
 // Built from the shared AppBottomSheet, AppButton, AppChip, AppRadioCard, AppAvatar, AppTag, AppInfoBanner and AppSearchBar; the
@@ -15,6 +15,8 @@ import {
 	AppAvatar,
 	AppBottomSheet,
 	AppButton,
+	AppCancelSheet,
+	type AppCancelResult,
 	AppChip,
 	AppInfoBanner,
 	AppRadioCard,
@@ -23,7 +25,7 @@ import {
 } from '../../../components/common'
 import { APP_COLORS, TONES, toneForString } from '../../../config/theme'
 import type { FavouriteDoctorListItem } from '../search/components/FavouriteDoctorList'
-import { composeReason, NoteField, ReasonList, type ReasonOption } from '../components/ReasonPicker'
+import { composeReason, NoteField, type ReasonOption } from '../components/ReasonPicker'
 import { SheetMenu } from '../components/SheetMenu'
 import { useReferDoctors } from '../components/useReferDoctors'
 
@@ -136,74 +138,64 @@ export function DeclineRequestSheet({
 	visible,
 	who,
 	firstName,
-	busy,
 	onClose,
 	onDecline,
+	onDeclined,
 	onChooseDoctor,
 }: {
 	visible: boolean
 	who: Who
 	firstName: string
-	busy: boolean
 	onClose: () => void
-	/** The reason as sent (the picked one, then the note). */
-	onDecline: (reason: string) => void
+	/** Declines with the reason as sent (the picked one, then the note) and returns how it went. */
+	onDecline: (reason: string) => Promise<AppCancelResult>
+	/** The confirmation was closed: the request is handled, refresh the list. */
+	onDeclined: () => void
 	/** "Refer to another doctor" was picked: carry on to the refer sheet. */
 	onChooseDoctor: () => void
 }) {
-	const [reasonId, setReasonId] = useState<string>(DECLINE_REASONS[0].id)
-	const [note, setNote] = useState('')
+	const [reason, setReason] = useState<string | null>(null)
+	const refer = reason === DECLINE_REASONS.find((r) => r.id === 'refer')?.label
 
-	useEffect(() => {
-		if (!visible) return
-		setReasonId(DECLINE_REASONS[0].id)
-		setNote('')
-	}, [visible])
-
-	const refer = reasonId === 'refer'
 	return (
-		<AppBottomSheet
+		<AppCancelSheet
 			visible={visible}
 			title="Decline request"
 			subtitle={`${firstName} will be told and can book another doctor.`}
+			reasons={DECLINE_REASONS.map((r) => r.label)}
+			reasonRequired
+			onReasonChange={setReason}
+			noteLabel="Message to patient"
+			noteMaxLength={REASON_MAX}
+			notice={{
+				tone: 'info',
+				text: refer
+					? `Next, pick the doctor. ${firstName} gets their profile and can book directly.`
+					: `${firstName} is notified with your reason.`,
+			}}
+			confirmLabel={refer ? 'Choose a doctor' : 'Decline request'}
+			confirmTone={refer ? 'primary' : 'danger'}
+			successTitle="Request declined"
+			successMessage={`${firstName} has been told and can book another doctor.`}
 			onClose={onClose}
-			appearance="modern"
+			onDone={onDeclined}
+			onConfirm={async (picked, note) => {
+				if (refer) {
+					onChooseDoctor()
+					return { ok: true, carryOn: true }
+				}
+				return onDecline(
+					composeReason(
+						DECLINE_REASONS,
+						DECLINE_REASONS.find((r) => r.label === picked)?.id ?? null,
+						note,
+						REASON_MAX
+					)
+				)
+			}}
 		>
-			<View style={{ gap: 16 }}>
-				<RequestStrip {...who} />
-				<View style={{ gap: 8 }}>
-					<Text style={styles.heading}>Reason</Text>
-					<ReasonList options={DECLINE_REASONS} value={reasonId} onChange={setReasonId} />
-				</View>
-				<NoteField
-					label="Note for the patient"
-					optional
-					placeholder="Add a short note"
-					value={note}
-					onChange={setNote}
-					maxLength={REASON_MAX}
-				/>
-				<Note
-					tone="info"
-					text={
-						refer
-							? `Next, pick the doctor. ${firstName} gets their profile and can book directly.`
-							: `${firstName} is notified with your reason.`
-					}
-				/>
-				<AppButton
-					size="lg"
-					variant={refer ? 'primary' : 'danger'}
-					loading={busy}
-					disabled={busy}
-					onPress={() =>
-						refer ? onChooseDoctor() : onDecline(composeReason(DECLINE_REASONS, reasonId, note, REASON_MAX))
-					}
-				>
-					{refer ? 'Choose a doctor' : 'Decline request'}
-				</AppButton>
-			</View>
-		</AppBottomSheet>
+			<RequestStrip {...who} />
+		</AppCancelSheet>
 	)
 }
 

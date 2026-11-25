@@ -45,6 +45,7 @@ import {
 } from '../../providerVisitService'
 import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { kmLabel, visitStart, visitTitle } from '../today/todayView'
+import { canReportRunningLate, RunningLateSheet } from '../schedule/RunningLateSheet'
 import { CancelVisitSheet } from './CancelVisitSheet'
 import { StartCodeSheet } from './StartCodeSheet'
 import { useLiveLocationShare } from './useLiveLocationShare'
@@ -75,6 +76,7 @@ export default function ProviderVisitDetailsPage() {
 	const [packed, setPacked] = useState<Record<string, boolean>>({})
 	const [startOpen, setStartOpen] = useState(false)
 	const [cancelOpen, setCancelOpen] = useState(false)
+	const [lateOpen, setLateOpen] = useState(false)
 	const [navigating, setNavigating] = useState(false)
 	const [arriving, setArriving] = useState(false)
 	const [reporting, setReporting] = useState(false)
@@ -250,6 +252,9 @@ export default function ProviderVisitDetailsPage() {
 			{header}
 			<ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 				<View style={styles.hero}>
+					<View style={styles.heroTile}>
+						<MaterialCommunityIcons name={copy.icon} size={24} color={APP_COLORS.primary} />
+					</View>
 					<View style={styles.heroText}>
 						<Text style={styles.heroTitle}>{visitTitle(visit, copy.noun)}</Text>
 						<Text style={styles.heroSub}>{whenLine}</Text>
@@ -540,11 +545,21 @@ export default function ProviderVisitDetailsPage() {
 				patientFirstName={first}
 				serviceTitle={visitTitle(visit, copy.noun)}
 				instant={!visit.date}
+				visitsCount={visit.visits_count}
+				dayIndex={visit.index}
 				onClose={() => setCancelOpen(false)}
 				onBackToToday={() => {
 					setCancelOpen(false)
 					navigation.goBack()
 				}}
+				onRunningLate={canReportRunningLate(visit.status, visit.date) ? () => setLateOpen(true) : undefined}
+			/>
+			<RunningLateSheet
+				visible={lateOpen}
+				visitId={visitId}
+				patientName={name}
+				line={visitTitle(visit, copy.noun)}
+				onClose={() => setLateOpen(false)}
 			/>
 		</View>
 	)
@@ -611,6 +626,14 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		gap: 12,
+	},
+	heroTile: {
+		width: 44,
+		height: 44,
+		borderRadius: 12,
+		backgroundColor: APP_COLORS.mint,
+		alignItems: 'center',
+		justifyContent: 'center',
 	},
 	heroText: {
 		flex: 1,

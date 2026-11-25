@@ -1,77 +1,84 @@
 // src/features/ancillary/staff/today/ProviderTodayContent.tsx
 //
-// Provider "Today" (ancillary-provider design, screen 1) rendered inside ProviderTodayScreen's scroll view for the
-// ancillary role: stats, open offers
-// pushed on the dispatch WebSocket (instant requests ring for 30 s in IncomingOfferSheet; per-visit offers of
-// provider-less orders show as banners, with an optional tip) and the next visit card. Stats: visits today,
-// earned today (dashboard metrics) and rating (average of approved reviews, "—" until there is one). Wording follows the provider's speciality (visit / session / shift). Data: GET
-// /provider/me/today, re-read on focus, on pull-to-refresh (refreshToken), every minute while focused, and
-// after every action. Offers are never polled: the socket pushes them (also the pending ones on connect).
+// Provider "Today" (the "Nursing · Today" screen of the Ancillary Home design): the header (photo, name, "Within N km", bell,
+// "Fri 20 Nov · 2 visits done today", the Online / Offline switch), an offline note, "Up next" (a snapping row of the visits still
+// to do, today's first), and "Needs your action" (open jobs near her; a row only when there is something). Open offers pushed on
+// the dispatch WebSocket are unchanged: an instant request rings for 30 s in IncomingOfferSheet, and an offer for one visit of a
+// provider-less scheduled order shows as a banner above "Up next". Wording follows the provider's speciality (visit / session /
+// shift). Data: GET /provider/me/today, re-read on focus, on pull-to-refresh, every minute while focused and after every action.
+// Offers are never polled here: the socket pushes them (also the pending ones on connect). The old stats row, availability card, next-visit
+// card and timeline are gone with the redesign (earnings and the full day live on Earnings and Schedule).
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, Vibration, View } from 'react-native'
+import {
+	ActivityIndicator,
+	RefreshControl,
+	ScrollView,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	Vibration,
+	View,
+} from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import Toast from 'react-native-toast-message'
 import { AppInfoBanner } from '../../../../components/common'
 import { APP_COLORS, formatInr } from '../../../../config/theme'
+import { useSidebarDrawer } from '../../../../components/layout/SidebarLayout'
+import { useAuth } from '../../../../context/AuthContext'
 import { ROUTES } from '../../../../navigation/routes'
-import { acceptCareRequestBackend, extractApiErrorMessage } from '../../ancillaryService'
+import { useTabBarClearance } from '../../../../navigation/tabBar'
+import { getUnreadNotificationCount } from '../../../../services/homeService'
+import { dismissOfferNotification } from '../../../../services/offerNotification'
+import { showStatusModal } from '../../../../services/apiService'
+import { formatTimeSlot } from '../../../../utils/formatters'
+import { getDevicePosition, getPlaceFromCoords } from '../../../../services/locationService'
+import { callPhone } from '../../../../utils/maps'
+import { acceptCareRequestBackend, extractApiErrorMessage, fetchProviderProfile } from '../../ancillaryService'
+import { getOpenJobs, type OpenJobs } from '../../providerOpenJobsService'
 import {
 	getProviderToday,
-	getTodayEarnings,
 	rejectOffer,
 	type ProviderOffer,
 	type ProviderToday,
 	type ProviderVisitSummary,
 } from '../../providerVisitService'
-import { dismissOfferNotification } from '../../../../services/offerNotification'
 import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
-import { ProviderAvailabilityCard } from './ProviderAvailabilityCard'
+import { PATHS } from '../schedule/scheduleTheme'
+import { todayIso as todayIsoOf } from '../schedule/scheduleModel'
+import { IncomingOfferSheet, type OfferPhase } from './IncomingOfferSheet'
+import { NeedsActionList, type ActionRow } from './NeedsActionList'
+import { VisitNotesSheet } from '../visit/VisitNotesSheet'
+import { ProviderHomeHeader } from './ProviderHomeHeader'
+import { UpNextCarousel } from './UpNextCarousel'
+import { useOverlayPermission } from './useOverlayPermission'
 import { useProviderDispatchSocket } from './useProviderDispatchSocket'
 import { useProviderOnline } from './useProviderOnline'
-import { useOverlayPermission } from './useOverlayPermission'
-import { IncomingOfferSheet, type OfferPhase } from './IncomingOfferSheet'
-import { ProviderNextVisitCard } from './ProviderNextVisitCard'
-import { ProviderScheduleTimeline } from './ProviderScheduleTimeline'
-import { getProviderAverageRating, ratingLabel } from './providerRating'
-import { isInstantOffer, isProviderWork, offerCollect, shortDay, tipLabel } from './todayView'
-import { showStatusModal } from '../../../../services/apiService'
+import { isInstantOffer, offerCollect, offerSeenAtMs, shortDay, tipLabel } from './todayView'
+import { toUpNextCard, upNextVisits } from './upNextView'
 
 const REFRESH_MS = 60_000
 /** The buzz when an instant request opens its sheet in the open app (the closed app's notification buzzes on its own channel). */
 const OFFER_VIBRATION = [0, 700, 400, 700, 400, 700]
 /** Seconds an instant request is held for this provider before it counts as missed. */
 const INSTANT_WINDOW_S = 30
+const NO_OPEN_JOBS: OpenJobs = { needed: [], nearby: [] }
 
-export type ProviderTodayContentProps = {
-	/** Bumped by the page's pull-to-refresh. */
-	refreshToken?: number
-	/** Called once a refresh-triggered load finishes (stops the page's spinner). */
-	onRefreshComplete?: () => void
-}
-
-function StatTile({ label, value }: { label: string; value: string }) {
-	return (
-		<View style={styles.statTile} accessible accessibilityLabel={`${label}: ${value}`}>
-			<Text style={styles.statLabel} numberOfLines={1}>
-				{label}
-			</Text>
-			<Text style={styles.statValue} numberOfLines={1}>
-				{value}
-			</Text>
-		</View>
-	)
-}
-
-export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: ProviderTodayContentProps) {
+export function ProviderTodayContent() {
 	const navigation = useNavigation<any>()
+	const clearance = useTabBarClearance()
+	const { user } = useAuth()
+	const drawer = useSidebarDrawer()
 	const [data, setData] = useState<ProviderToday | null>(null)
 	const [loading, setLoading] = useState(true)
+	const [refreshing, setRefreshing] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [nowMs, setNowMs] = useState(() => Date.now())
 	const [focused, setFocused] = useState(false)
-	const [earnedToday, setEarnedToday] = useState<number | null>(null)
-	const [rating, setRating] = useState<number | null>(null)
-	const ratingFor = useRef<string | null>(null)
+	const [notificationCount, setNotificationCount] = useState(0)
+	const [radiusKm, setRadiusKm] = useState<number | null>(null)
+	const [areaName, setAreaName] = useState<string | null>(null)
+	const [openJobs, setOpenJobs] = useState<OpenJobs>(NO_OPEN_JOBS)
+	const [notesOpen, setNotesOpen] = useState(false)
 	const [offers, setOffers] = useState<ProviderOffer[]>([])
 	const [sheetOffer, setSheetOffer] = useState<ProviderOffer | null>(null)
 	const [offerPhase, setOfferPhase] = useState<OfferPhase>('open')
@@ -85,32 +92,11 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 
 	const load = useCallback(async (): Promise<ProviderToday | null> => {
 		const seq = ++requestSeq.current
-		const loadEarnings = async () => {
-			try {
-				setEarnedToday(await getTodayEarnings())
-			} catch {
-				setEarnedToday(null)
-			}
-		}
-		void loadEarnings()
 		try {
 			const today = await getProviderToday()
 			if (seq !== requestSeq.current) return null
 			setData(today)
 			setError(null)
-			// Rating belongs to the provider, not the day: read once per provider.
-			const providerId = today.provider.provider_public_id
-			if (providerId && ratingFor.current !== providerId) {
-				ratingFor.current = providerId
-				const loadRating = async () => {
-					try {
-						setRating(await getProviderAverageRating(providerId))
-					} catch {
-						ratingFor.current = null
-					}
-				}
-				void loadRating()
-			}
 			return today
 		} catch (e) {
 			if (seq !== requestSeq.current) return null
@@ -124,26 +110,62 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 		}
 	}, [])
 
+	/** What the header and "Needs your action" show besides the day: the bell, the travel radius and the open jobs. */
+	const loadSide = useCallback(async () => {
+		try {
+			setNotificationCount(await getUnreadNotificationCount())
+		} catch {
+			// The bell just shows no dot.
+		}
+		try {
+			const profile = await fetchProviderProfile()
+			const r = Number(profile?.geofence_radius_km ?? profile?.geofence_radius)
+			setRadiusKm(Number.isFinite(r) && r > 0 ? Math.round(r) : null)
+		} catch {
+			setRadiusKm(null)
+		}
+		try {
+			setOpenJobs(await getOpenJobs())
+		} catch {
+			setOpenJobs(NO_OPEN_JOBS)
+		}
+	}, [])
+
 	useFocusEffect(
 		useCallback(() => {
 			setFocused(true)
 			void load()
+			void loadSide()
 			return () => setFocused(false)
-		}, [load])
+		}, [load, loadSide])
 	)
 
-	// Pull-to-refresh from the page.
-	const firstToken = useRef(refreshToken)
+	const onRefresh = async () => {
+		setRefreshing(true)
+		await Promise.all([load(), loadSide()])
+		setRefreshing(false)
+	}
+
+	// Where she is, by name, for the header pill: the device's last position, and only when location is already allowed (no prompt).
 	useEffect(() => {
-		if (refreshToken === firstToken.current) return
+		let active = true
 		const run = async () => {
-			await load()
-			onRefreshComplete?.()
+			try {
+				const pos = await getDevicePosition({ maxAgeMs: 60 * 60 * 1000 })
+				if (pos.status !== 'ok' || !active) return
+				const place = await getPlaceFromCoords(pos.position.latitude, pos.position.longitude)
+				if (active && place?.area) setAreaName(place.area)
+			} catch {
+				// The pill just says the radius.
+			}
 		}
 		void run()
-	}, [refreshToken, load, onRefreshComplete])
+		return () => {
+			active = false
+		}
+	}, [])
 
-	// Keep the next visit and the day's schedule fresh: re-read every minute while the screen is visible.
+	// Keep the visits fresh: re-read every minute while the screen is visible.
 	useEffect(() => {
 		if (!focused) return
 		const t = setInterval(() => void load(), REFRESH_MS)
@@ -176,7 +198,9 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 				setOfferPhase((p) => (sheetOfferRef.current?.requestId === offer.requestId ? 'open' : p))
 			}
 			// Same request id again (tip changed, reconnect re-push) updates in place; the 30 s window is kept.
-			if (!offerSeenAt.current[offer.requestId]) offerSeenAt.current[offer.requestId] = Date.now()
+			// The server's time left on her offer wins (a re-push of the same offer corrects it); else the 30 s count from now.
+			if (offer.expiresInMs != null || !offerSeenAt.current[offer.requestId])
+				offerSeenAt.current[offer.requestId] = offerSeenAtMs(Date.now(), offer.expiresInMs, INSTANT_WINDOW_S)
 			setNowMs(Date.now())
 			setOffers((prev) =>
 				prev.some((o) => o.requestId === offer.requestId)
@@ -237,6 +261,14 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 	const sheetSecs = sheetOffer ? offerSecondsLeft(sheetOffer) : null
 	const phase: OfferPhase = offerPhase === 'open' && sheetSecs === 0 ? 'missed' : offerPhase
 
+	// A request that ran out on her stays open for other nurses (and for her): read "Needed now" so the sheet can say so.
+	useEffect(() => {
+		if (phase !== 'missed') return
+		void getOpenJobs()
+			.then(setOpenJobs)
+			.catch(() => undefined)
+	}, [phase])
+
 	/** A visit in progress opens straight into the in-progress screen; anything else shows its details. */
 	const openVisit = (visit: ProviderVisitSummary) => {
 		navigation.navigate(
@@ -246,6 +278,9 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 			{ visitId: visit.visit_public_id }
 		)
 	}
+
+	/** The Schedule tab (the provider's Portal tab). */
+	const openSchedule = () => navigation.navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL })
 
 	const closeOfferSheet = () => {
 		Vibration.cancel()
@@ -314,163 +349,266 @@ export function ProviderTodayContent({ refreshToken = 0, onRefreshComplete }: Pr
 		}
 	}
 
-	if (loading && !data) {
-		return (
-			<View style={styles.loadingBox}>
-				<ActivityIndicator color={APP_COLORS.primary} />
-			</View>
-		)
+	const cards = data ? upNextVisits(data.schedule, data.upcoming).map((v, i) => toUpNextCard(v, i, copy.noun)) : []
+	/** The Online / Offline switch (header pill and the offline note): says what changed, once it has. */
+	const goOnline = async (next: boolean) => {
+		if (await availability.setOnline(next)) {
+			Toast.show({
+				type: 'info',
+				text1: next
+					? 'You’re online · instant requests near you will ring here'
+					: 'You’re offline · no instant requests until you go online',
+			})
+		}
 	}
 
-	const stats = data?.stats
-	// A visit nobody took (UNASSIGNED) is not this provider's work: never shown.
-	const nextVisit = data?.next_visit && isProviderWork(data.next_visit.status) ? data.next_visit : null
+	const done = data?.stats.visits_done ?? 0
+	const offline = availability.online === false
+
+	// "Your next visit: 7:00 PM with Vikram K." under an instant request: the first visit still to do today that starts later.
+	const nowHm = `${String(new Date(nowMs).getHours()).padStart(2, '0')}:${String(new Date(nowMs).getMinutes()).padStart(2, '0')}`
+	const nextToday = data
+		? upNextVisits(data.schedule, [])
+				.filter((v) => v.start_time && v.start_time.slice(0, 5) > nowHm)
+				.sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? ''))[0]
+		: undefined
+	const nextVisitLine = nextToday
+		? `Your next ${copy.noun}: ${formatTimeSlot(nextToday.start_time)}${nextToday.patient.name ? ` with ${nextToday.patient.name}` : ''}`
+		: null
+
+	const actionRows: ActionRow[] = []
+	if (openJobs.nearby.length > 0) {
+		actionRows.push({
+			key: 'open-jobs',
+			title: 'Open jobs near you',
+			sub: `Scheduled ${copy.noun}s this week · first to pick up gets them`,
+			count: openJobs.nearby.length,
+			icon: PATHS.pin,
+			tone: 'amber',
+			onPress: openSchedule,
+		})
+	}
+
+	// "Visit notes to finish": her completed visits with no notes yet, inside the window in which notes can still be written.
+	const notesPending = data?.notes_pending ?? []
+	if (notesPending.length > 0) {
+		const firstPending = notesPending[0]
+		actionRows.push({
+			key: 'notes',
+			title: 'Visit notes to finish',
+			sub: `${firstPending.patient_name} · ${firstPending.service_name}${
+				notesPending.length > 1 ? ` + ${notesPending.length - 1} more` : ''
+			}`,
+			count: notesPending.length,
+			icon: PATHS.file,
+			tone: 'teal',
+			onPress: () => setNotesOpen(true),
+		})
+	}
 
 	return (
 		<View style={styles.root}>
-			{error ? (
-				<View style={styles.padded}>
-					<AppInfoBanner
-						tone="danger"
-						title="Couldn't load your day"
-						subtitle={error}
-						action={{ label: 'Retry', onPress: () => void load() }}
-					/>
-				</View>
-			) : null}
+			<ProviderHomeHeader
+				name={user?.name || data?.provider.name || 'Provider'}
+				avatarUri={user?.avatar}
+				areaLabel={
+					radiusKm != null
+						? areaName
+							? `${areaName} · within ${radiusKm} km`
+							: `Within ${radiusKm} km`
+						: areaName
+				}
+				notificationCount={notificationCount}
+				dateLabel={shortDay(todayIsoOf())}
+				doneLine={data ? `${done} ${done === 1 ? copy.noun : `${copy.noun}s`} done today` : null}
+				online={availability.online}
+				busy={availability.busy}
+				onAvatarPress={drawer.open}
+				onAreaPress={() => navigation.navigate(ROUTES.STACK.PROFILE_AVAILABILITY)}
+				onNotificationsPress={() => navigation.navigate(ROUTES.STACK.NOTIFICATION)}
+				onToggleOnline={() => void goOnline(availability.online !== true)}
+			/>
 
-			<View style={styles.padded}>
-				<ProviderAvailabilityCard
-					online={availability.online === true}
-					busy={availability.busy || availability.online === null}
-					noun={copy.noun}
-					onChange={(v) => void availability.setOnline(v)}
-				/>
-			</View>
-
-			{overlay.needed ? (
-				<View style={styles.padded}>
-					<AppInfoBanner
-						tone="warning"
-						icon="layers-outline"
-						title="Show new requests over other apps"
-						subtitle="Allow “Display over other apps” so a new request appears on top of your screen, even when the app is closed."
-						action={{ label: 'Allow', onPress: overlay.open }}
-					/>
-				</View>
-			) : null}
-
-			{stats ? (
-				<View style={styles.statRow}>
-					<StatTile label={copy.today.statLabel} value={`${stats.visits_done} of ${stats.visits_total}`} />
-					<StatTile label="Earned today" value={earnedToday == null ? '—' : formatInr(earnedToday)} />
-					<StatTile label="Rating" value={ratingLabel(rating)} />
-				</View>
-			) : null}
-
-			{liveOffers.map((o) => {
-				const secs = offerSecondsLeft(o)
-				const instant = isInstantOffer(o)
-				return (
-					<View key={o.requestId} style={styles.padded}>
+			<ScrollView
+				contentContainerStyle={[styles.content, { paddingBottom: clearance + 16 }]}
+				showsVerticalScrollIndicator={false}
+				refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} />}
+			>
+				{error ? (
+					<View style={styles.padded}>
 						<AppInfoBanner
-							tone="sky"
-							icon={instant ? 'flash' : 'calendar-plus'}
-							title={
-								instant
-									? `Instant request${o.patientName ? ` from ${o.patientName}` : ''}`
-									: `New ${copy.noun} request${o.patientName ? ` from ${o.patientName}` : ''}`
-							}
-							subtitle={[
-								o.serviceName,
-								o.scheduledDate ? shortDay(o.scheduledDate) : null,
-								instant && secs != null ? `reply in ${secs} sec` : null,
-								formatInr(offerCollect(o)),
-								tipLabel(o.tipAmount),
-							]
-								.filter(Boolean)
-								.join(' · ')}
-							onPress={() => {
-								setOfferPhase('open')
-								setSheetOffer(o)
-							}}
-							chevron
+							tone="danger"
+							title="Couldn't load your day"
+							subtitle={error}
+							action={{ label: 'Retry', onPress: () => void load() }}
 						/>
 					</View>
-				)
-			})}
+				) : null}
 
-			{nextVisit ? (
-				<View style={styles.padded}>
-					<ProviderNextVisitCard visit={nextVisit} copy={copy} onOpen={openVisit} />
-				</View>
-			) : null}
+				{offline ? (
+					<View style={[styles.padded, styles.offlineWrap]}>
+						<View style={styles.offline} accessibilityRole="alert">
+							<View style={styles.offlineText}>
+								<Text style={styles.offlineTitle}>You’re offline</Text>
+								<Text style={styles.offlineBody}>
+									{`You won’t get instant requests. Your scheduled ${copy.noun}s still stand.`}
+								</Text>
+							</View>
+							<TouchableOpacity
+								onPress={() => void goOnline(true)}
+								disabled={availability.busy}
+								activeOpacity={0.85}
+								style={styles.goOnline}
+								accessibilityRole="button"
+							>
+								<Text style={styles.goOnlineText}>Go online</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				) : null}
 
-			{data ? (
-				<View style={styles.padded}>
-					<ProviderScheduleTimeline
-						schedule={data.schedule}
-						upcoming={data.upcoming}
-						nextVisitId={nextVisit?.visit_public_id}
-						copy={copy}
-						onOpen={openVisit}
+				{overlay.needed ? (
+					<View style={styles.padded}>
+						<AppInfoBanner
+							tone="warning"
+							icon="layers-outline"
+							title="Show new requests over other apps"
+							subtitle="Allow “Display over other apps” so a new request appears on top of your screen, even when the app is closed."
+							action={{ label: 'Allow', onPress: overlay.open }}
+						/>
+					</View>
+				) : null}
+
+				{liveOffers.map((o) => {
+					const secs = offerSecondsLeft(o)
+					const instant = isInstantOffer(o)
+					return (
+						<View key={o.requestId} style={styles.padded}>
+							<AppInfoBanner
+								tone="sky"
+								icon={instant ? 'flash' : 'calendar-plus'}
+								title={
+									instant
+										? `Instant request${o.patientName ? ` from ${o.patientName}` : ''}`
+										: `New ${copy.noun} request${o.patientName ? ` from ${o.patientName}` : ''}`
+								}
+								subtitle={[
+									o.serviceName,
+									o.scheduledDate ? shortDay(o.scheduledDate) : null,
+									instant && secs != null ? `reply in ${secs} sec` : null,
+									formatInr(offerCollect(o)),
+									tipLabel(o.tipAmount),
+								]
+									.filter(Boolean)
+									.join(' · ')}
+								onPress={() => {
+									setOfferPhase('open')
+									setSheetOffer(o)
+								}}
+								chevron
+							/>
+						</View>
+					)
+				})}
+
+				{loading && !data ? (
+					<View style={styles.loadingBox}>
+						<ActivityIndicator color={APP_COLORS.primary} />
+					</View>
+				) : cards.length > 0 ? (
+					<UpNextCarousel
+						cards={cards}
+						onOpen={(c) => openVisit(c.visit)}
+						onCall={(c) => void callPhone(c.visit.patient.phone)}
+						onFullSchedule={openSchedule}
 					/>
-				</View>
-			) : null}
+				) : data ? (
+					<View style={styles.padded}>
+						<View style={styles.empty}>
+							<Text style={styles.emptyTitle}>{`No ${copy.noun}s coming up`}</Text>
+							<Text style={styles.emptySub}>
+								{offline
+									? 'Go online to get requests near you.'
+									: 'New requests near you will show here.'}
+							</Text>
+							<TouchableOpacity onPress={openSchedule} accessibilityRole="link" style={styles.emptyLink}>
+								<Text style={styles.emptyLinkText}>Full schedule</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				) : null}
 
-			<IncomingOfferSheet
-				offer={sheetOffer}
-				copy={copy}
-				phase={phase}
-				secondsLeft={sheetSecs}
-				busy={offerBusy}
-				onAccept={(o) => void handleAcceptOffer(o)}
-				onDecline={(o) => void handleDeclineOffer(o)}
-				onClose={closeOfferSheet}
+				<NeedsActionList rows={actionRows} />
+
+				<IncomingOfferSheet
+					offer={sheetOffer}
+					copy={copy}
+					phase={phase}
+					secondsLeft={sheetSecs}
+					busy={offerBusy}
+					nextVisitLine={nextVisitLine}
+					onAccept={(o) => void handleAcceptOffer(o)}
+					onDecline={(o) => void handleDeclineOffer(o)}
+					onClose={closeOfferSheet}
+					stillOpen={!!sheetOffer && openJobs.needed.some((j) => j.id === sheetOffer.requestId)}
+					onSeeNeeded={() => {
+						closeOfferSheet()
+						openSchedule()
+					}}
+				/>
+			</ScrollView>
+			<VisitNotesSheet
+				visible={notesOpen}
+				items={notesPending}
+				onClose={() => setNotesOpen(false)}
+				onSaved={() => void load()}
 			/>
 		</View>
 	)
 }
 
 const styles = StyleSheet.create({
-	root: {
-		gap: 8,
-		paddingTop: 8,
-	},
-	padded: {
-		paddingHorizontal: 16,
-	},
-	loadingBox: {
-		paddingVertical: 48,
-		alignItems: 'center',
-	},
-	statRow: {
+	root: { flex: 1, backgroundColor: APP_COLORS.pageBg },
+	content: { gap: 20, paddingTop: 16 },
+	padded: { paddingHorizontal: 16 },
+	loadingBox: { paddingVertical: 48, alignItems: 'center' },
+	offlineWrap: { marginTop: -4 },
+	offline: {
 		flexDirection: 'row',
-		gap: 8,
-		paddingHorizontal: 16,
-	},
-	statTile: {
-		flex: 1,
-		minWidth: 0,
-		gap: 2,
+		alignItems: 'flex-start',
+		gap: 10,
 		padding: 12,
-		borderRadius: 12,
+		paddingHorizontal: 14,
+		borderRadius: 14,
+		backgroundColor: APP_COLORS.warningBg,
+		borderWidth: 1,
+		borderColor: '#F0D9AE',
+	},
+	offlineText: { flex: 1, gap: 2 },
+	offlineTitle: { fontSize: 14, lineHeight: 19, fontWeight: '700', color: APP_COLORS.warning },
+	offlineBody: { fontSize: 12, lineHeight: 17, color: '#3F5357' },
+	goOnline: {
+		height: 34,
+		paddingHorizontal: 12,
+		borderRadius: 9,
+		backgroundColor: APP_COLORS.primary,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	goOnlineText: { fontSize: 13, fontWeight: '800', color: '#FFFFFF' },
+	empty: {
+		padding: 20,
+		borderRadius: 14,
 		borderWidth: 1,
 		borderColor: APP_COLORS.divider,
 		backgroundColor: APP_COLORS.surface,
+		alignItems: 'center',
+		gap: 4,
 	},
-	statLabel: {
-		fontSize: 11,
-		lineHeight: 14,
-		fontWeight: '700',
-		color: APP_COLORS.inkMuted,
-	},
-	statValue: {
-		fontSize: 16,
-		lineHeight: 22,
-		fontWeight: '800',
-		color: APP_COLORS.ink,
-	},
+	emptyTitle: { fontSize: 15, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
+	emptySub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted, textAlign: 'center' },
+	emptyLink: { marginTop: 6, height: 36, justifyContent: 'center' },
+	emptyLinkText: { fontSize: 13, fontWeight: '700', color: APP_COLORS.primary },
 })
 
 export default ProviderTodayContent
