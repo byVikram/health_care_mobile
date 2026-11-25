@@ -6,7 +6,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { TextInputInstance, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import Toast from 'react-native-toast-message'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { AppBottomSheet, AppButton } from '../../../../components/common'
 import { APP_COLORS } from '../../../../config/theme'
 import { extractApiErrorMessage } from '../../ancillaryService'
@@ -117,7 +116,6 @@ export function StartCodeSheet({ visible, visitId, patientFirstName, copy, onClo
 					</Text>
 				) : null}
 				<View style={styles.hint}>
-					<MaterialCommunityIcons name="shield-check-outline" size={16} color={APP_COLORS.primary} />
 					<Text style={styles.hintText}>
 						{`The code proves you reached ${patientFirstName}’s home. It ${copy.startHint} and the patient is notified.`}
 					</Text>
@@ -127,7 +125,6 @@ export function StartCodeSheet({ visible, visitId, patientFirstName, copy, onClo
 				</Pressable>
 				<AppButton
 					size="lg"
-					icon={ready ? 'check' : undefined}
 					onPress={() => void submit()}
 					loading={submitting}
 					disabled={!ready || submitting}
