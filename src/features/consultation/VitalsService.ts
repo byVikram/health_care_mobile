@@ -13,8 +13,20 @@ export interface VitalRecord {
 	vital_type: string
 	recorded_at: string
 	value: Record<string, unknown>
+	/** How the reading rates, worked out by the backend (patients/vitals.py): null for weight, height and others. */
+	rating?: 'normal' | 'medium' | 'high' | null
 	created_at: string
 }
+
+/** One band of a rated reading: a value is in the last band it has reached (equal to `starts_at` counts only when `inclusive`). */
+export interface VitalBand {
+	rating: 'normal' | 'medium' | 'high'
+	starts_at: number | null
+	inclusive: boolean
+}
+
+/** The bands per rated reading (systolic, diastolic, pulse_rate, spo2, temperature, random), lowest first. */
+export type VitalRanges = Record<string, { label: string; unit: string; bands: VitalBand[] }>
 
 export interface ReportRecord {
 	id: string
@@ -57,7 +69,7 @@ interface PatientMetrics {
 
 type VitalValue = Record<string, unknown>
 
-const OTHER_VITAL_TYPES = ['others', 'temperature', 'spo2'] as const
+const OTHER_VITAL_TYPES = ['others', 'pulse', 'temperature', 'spo2'] as const
 
 const SUMMARY_CONFIG: Record<string, { unit: string; getValue: (value: VitalValue) => string }> = {
 	temperature: {
@@ -307,6 +319,14 @@ export async function getRecentVitals(patientPublicId: string, days: number): Pr
 	return response.data.data ?? []
 }
 
+/** The bands the backend rates a reading by, so a field can be coloured while it is typed (no numbers are kept in the app). */
+export async function getVitalRanges(): Promise<VitalRanges> {
+	const response = await ApiService.get<{ success: boolean; data: VitalRanges }>(API_ENDPOINTS.PATIENT.VITAL_RANGES, {
+		skipGlobalError: true,
+	}) // a failure only means no colour while typing: no dialog
+	return response.data.data ?? {}
+}
+
 export async function getLatestVitals(
 	patientPublicId: string,
 	metrics?: PatientMetrics | null
@@ -316,10 +336,18 @@ export async function getLatestVitals(
 		metrics !== undefined ? Promise.resolve(metrics) : getPatientMetrics(patientPublicId).catch(() => null),
 	])
 
+	// Height is taken at every visit: the latest `height` reading, not only the profile's, gives the BMI of the weight.
+	const heightRecord = response.data.data?.height?.value as Record<string, unknown> | undefined
+	const heightFromVitals = toNumber(heightRecord?.height ?? heightRecord?.value)
+	const metricsForBmi: PatientMetrics | undefined =
+		heightFromVitals !== null
+			? { heightCm: heightFromVitals, weightKg: resolvedMetrics?.weightKg ?? null }
+			: (resolvedMetrics ?? undefined)
+
 	return Object.fromEntries(
 		Object.entries(response.data.data ?? {}).map(([vitalType, record]) => [
 			vitalType,
-			record ? normalizeVitalRecord(record, resolvedMetrics ?? undefined) : null,
+			record ? normalizeVitalRecord(record, metricsForBmi) : null,
 		])
 	)
 }
@@ -528,6 +556,7 @@ function failureReason(error: unknown): string {
 export const vitalsService = {
 	getLatestVitals,
 	getRecentVitals,
+	getVitalRanges,
 	getVitalsHistory,
 	getPatientReports,
 	mapLatestVitalsToStats,

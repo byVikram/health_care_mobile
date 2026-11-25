@@ -154,6 +154,7 @@ export const API_ENDPOINTS = {
 		VITALS_CREATE: `${BASE_URL}/api/patients/vitals`,
 		VITALS_LATEST: (id: string) => `${BASE_URL}/api/patients/${id}/vitals/latest`,
 		VITALS_HISTORY: (id: string) => `${BASE_URL}/api/patients/${id}/vitals`,
+		VITAL_RANGES: `${BASE_URL}/api/patients/vitals/ranges`,
 		REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/reports`,
 		LABORATORY_REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/laboratory-reports`,
 		RADIOLOGY_REPORTS: (id: string) => `${BASE_URL}/api/patients/${id}/radiology-reports`,

@@ -1,8 +1,8 @@
 // src/features/consultation/components/VitalFieldTile.tsx
 //
 // One reading in the "Record vitals" sheet (design: the 2-column field grid): label with a range dot, the value in a large
-// numeric input and its unit beside it. The dot and the border follow how the typed value rates against its normal range
-// (see rateVital), so an out-of-range reading shows as it is typed. A tap anywhere on the tile focuses the input.
+// numeric input and its unit beside it. The dot and the border follow how the typed value rates (normal / medium / high by the
+// backend's bands, see rateTyped), so a reading outside the range shows as it is typed. A tap anywhere on the tile focuses the input.
 
 import React, { useRef } from 'react'
 import {
@@ -16,18 +16,19 @@ import {
 	type ViewStyle,
 } from 'react-native'
 import { APP_COLORS } from '../../../config/theme'
-import { RATING_LABELS, RATING_TONES, rateVital, type VitalField } from '../vitalsEntry'
+import { RATING_LABELS, RATING_TONES, type VitalField, type VitalRating } from '../vitalsEntry'
 
 type Props = {
 	field: VitalField
 	value: string
+	/** How the typed value rates ('unset' while the bands are not known: the tile is then not coloured). */
+	rating: VitalRating
 	onChangeText: (text: string) => void
 	style?: StyleProp<ViewStyle>
 }
 
-export function VitalFieldTile({ field, value, onChangeText, style }: Props) {
+export function VitalFieldTile({ field, value, rating, onChangeText, style }: Props) {
 	const inputRef = useRef<TextInputInstance>(null)
-	const rating = rateVital(field.id, value)
 	const tone = RATING_TONES[rating]
 
 	return (
