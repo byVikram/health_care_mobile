@@ -2,18 +2,14 @@
 //
 // Cancel / move visits of a scheduled order for Booking details and View visit. Cancelling returns how it went (the cancel sheet shows
 // the confirmation, or the server's own message when it refuses -- e.g. the visit got too close while the sheet was open); moving
-// shows a toast. Both refresh the order either way, so the screen always shows what the server has now.
+// returns how it went the same way, for the reschedule sheet (its toast on success, its inline message when the server refuses).
+// Both refresh the order either way, so the screen always shows what the server has now.
 
-import { useState } from 'react'
-import Toast from 'react-native-toast-message'
 import { cancelAncillaryVisits, rescheduleAncillaryVisit } from '../ancillaryProviderBookingService'
-import type { AppCancelResult } from '../../../components/common'
+import type { AppCancelResult, AppRescheduleResult } from '../../../components/common'
 import { apiErrorMessage } from './useVisitPatientAddress'
-import { showStatusModal } from '../../../services/apiService'
 
 export function useVisitEdits(requestId: string, refresh: () => Promise<void>) {
-	const [moving, setMoving] = useState(false)
-
 	/** How the cancellation went (for AppCancelSheet's onConfirm). */
 	const cancelVisits = async (visitIds: string[], reason: string): Promise<AppCancelResult> => {
 		try {
@@ -26,26 +22,17 @@ export function useVisitEdits(requestId: string, refresh: () => Promise<void>) {
 		}
 	}
 
-	/** True when the visit was moved. */
-	const moveVisit = async (visitId: string, date: string, startTime: string) => {
-		setMoving(true)
+	/** How the move went (for AppRescheduleSheet's onConfirm). */
+	const moveVisit = async (visitId: string, date: string, startTime: string): Promise<AppRescheduleResult> => {
 		try {
 			await rescheduleAncillaryVisit(requestId, visitId, date, startTime)
-			Toast.show({ type: 'success', text1: 'Visit rescheduled' })
-			return true
+			return { ok: true }
 		} catch (e) {
-			showStatusModal({
-				status: 'error',
-				title: "Couldn't reschedule",
-				description: apiErrorMessage(e) || 'Please try again.',
-				submitText: 'OK',
-			})
-			return false
+			return { ok: false, error: apiErrorMessage(e) || 'Please try again.' }
 		} finally {
-			setMoving(false)
 			void refresh()
 		}
 	}
 
-	return { moving, cancelVisits, moveVisit }
+	return { cancelVisits, moveVisit }
 }

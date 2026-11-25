@@ -1,18 +1,18 @@
 // src/features/laboratory/LabOrderSheets.tsx
 //
 // The two bottom sheets on the Lab order screen: "Cancel this order?" (reasons, "Reschedule instead", Keep it /
-// Yes, cancel) and "Reschedule" (current slot struck through, a 14-day strip and that day's real free times at the
+// Yes, cancel) and "Reschedule" (the current slot, a 14-day strip and that day's real free times at the
 // order's lab, "Confirm · day, time"), both on the shared AppCancelSheet / AppRescheduleSheet that the patient
 // appointment sheets use too. Both call our API (/api/laboratory/orders/{id}/cancel | reschedule | slots).
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import Toast from 'react-native-toast-message'
 import {
 	AppCancelSheet,
 	type AppCancelResult,
 	AppRescheduleGroup,
 	AppRescheduleSheet,
+	type AppRescheduleResult,
 	SlotChipGrid,
 	type SlotChipItem,
 } from '../../components/common'
@@ -107,7 +107,6 @@ export function LabRescheduleSheet({ visible, orderId, subtitle, current, onClos
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const [tick, setTick] = useState(0)
-	const [busy, setBusy] = useState(false)
 
 	useEffect(() => {
 		if (!visible) return
@@ -141,17 +140,13 @@ export function LabRescheduleSheet({ visible, orderId, subtitle, current, onClos
 		}
 	}, [visible, orderId, day, tick])
 
-	const confirm = async () => {
-		if (!time) return
-		setBusy(true)
+	// The shared sheet shows the spinner, the inline error and the "Order rescheduled" toast; the rescheduled order goes to `onDone`.
+	const confirm = async (): Promise<AppRescheduleResult<ApiOrder>> => {
+		if (!time) return { ok: false, error: 'Pick a new time first.' }
 		try {
-			onRescheduled(await rescheduleOrder(orderId, day, time))
+			return { ok: true, data: await rescheduleOrder(orderId, day, time) }
 		} catch (e) {
-			Toast.show({ type: 'error', text1: 'Couldn’t reschedule', text2: labErrorMessage(e) })
-			setTick((n) => n + 1) // the time may have just gone: reload the free ones
-			setTime(null)
-		} finally {
-			setBusy(false)
+			return { ok: false, error: labErrorMessage(e) }
 		}
 	}
 
@@ -198,8 +193,14 @@ export function LabRescheduleSheet({ visible, orderId, subtitle, current, onClos
 			note="Same lab, a new time. Fasting tests work best in a morning slot."
 			confirmLabel={time ? `Confirm · ${commaDate(day)}, ${timeLabel(time)}` : 'Select a new time'}
 			confirmDisabled={!time}
-			busy={busy}
-			onConfirm={() => void confirm()}
+			onConfirm={confirm}
+			successTitle="Order rescheduled"
+			onDone={(result) => result.data && onRescheduled(result.data)}
+			// The time may have just gone: reload the free ones and drop the pick (the message stays until the next try).
+			onFailed={() => {
+				setTick((n) => n + 1)
+				setTime(null)
+			}}
 			onClose={onClose}
 		>
 			{loading && <ActivityIndicator color={APP_COLORS.primary} />}
