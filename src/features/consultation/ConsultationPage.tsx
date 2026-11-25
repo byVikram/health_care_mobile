@@ -57,7 +57,15 @@ import {
 } from './ConsultationService'
 import { getLatestVitals, getRecentVitals, type VitalRecord } from './VitalsService'
 import { useRecordVitals, type RecentLoad } from './useRecordVitals'
-import { TODAYS_VITALS_LOOKBACK_DAYS, VITAL_THRESHOLDS, latestPulse } from './vitalsEntry'
+import {
+	TODAYS_VITALS_LOOKBACK_DAYS,
+	bodyMetrics,
+	latestPulse,
+	ratingOf,
+	todaysVitals,
+	worstRating,
+	type VitalRating,
+} from './vitalsEntry'
 import { buildS3Url } from '../../utils/s3Utils'
 import { bookingRef } from '../../utils/formatters'
 import { formatFullDate, parseDateOnly } from '../../utils/date'
@@ -861,8 +869,10 @@ function DoctorConsultation() {
 	const modeLabel = appointment?.appointment_mode === 'video_call' ? 'Video' : 'In-clinic'
 	const timeLabel = formatTime12h(appointment?.start_time)
 	const bloodGroup = patient?.blood_group || '--'
-	const weightLabel = patient?.weight ? patient.weight.replace(/\s*kg$/i, '') : '--'
-	const bmi = computeBmi(patient?.height, patient?.weight) ?? '--'
+	// Weight and height are taken at every visit: today's reading is shown, the profile's is the fallback.
+	const { weightKg, heightCm } = bodyMetrics(todaysVitals(recentVitals).values, patient ?? {}, latestVitals)
+	const weightLabel = weightKg ? String(weightKg) : '--'
+	const bmi = computeBmi(heightCm ? String(heightCm) : null, weightKg ? String(weightKg) : null) ?? '--'
 	const visitsLabel = treatmentHistory.length > 0 ? ordinal(treatmentHistory.length + 1) : '1st'
 
 	// ── Derived: allergy banner ──
@@ -882,29 +892,25 @@ function DoctorConsultation() {
 	const spo2Record = latestVitals.spo2
 	const tempRecord = latestVitals.temperature
 	const othersRecord = latestVitals.others
-	// Pulse has no dedicated vital_type of its own: it is in a blood-pressure record (`pulse`) or in an "others" record
-	// (`pulse_rate`, what the app saves), and the more recent of the two is shown.
-	const pulseValue = latestPulse(bpRecord, othersRecord)
+	// Pulse has its own vital_type; a reading saved before that sits in a blood-pressure record (`pulse`) or an "others" record
+	// (`pulse_rate`): the most recent of them is shown.
+	const pulseValue = latestPulse(bpRecord, othersRecord, latestVitals.pulse)
 
 	const bpValue = bpRecord ? `${(bpRecord.value as any)?.systolic ?? '--'}/${(bpRecord.value as any)?.diastolic ?? '--'}` : null
-	const bpSystolic = bpRecord ? Number((bpRecord.value as any)?.systolic) : null
-	const bpDiastolic = bpRecord ? Number((bpRecord.value as any)?.diastolic) : null
-	const bpHigh =
-		(bpSystolic !== null && bpSystolic >= VITAL_THRESHOLDS.bpSystolicHigh) ||
-		(bpDiastolic !== null && bpDiastolic >= VITAL_THRESHOLDS.bpDiastolicHigh)
 
 	const glucoseValue = glucoseRecord
 		? String((glucoseRecord.value as any)?.random ?? (glucoseRecord.value as any)?.fasting ?? '--')
 		: null
-	const glucoseNum = glucoseValue ? Number(glucoseValue) : null
-	const glucoseHigh = glucoseNum !== null && glucoseNum >= VITAL_THRESHOLDS.glucoseHighMgDl
 
-	// The real seeded spo2 records use "value" as the key (not "spo2") -- fall back to "spo2" in
-	// case a future recording uses that shape instead.
-	const spo2Raw = (spo2Record?.value as any)?.value ?? (spo2Record?.value as any)?.spo2
+	// The key is `spo2`; older records used `value`.
+	const spo2Raw = (spo2Record?.value as any)?.spo2 ?? (spo2Record?.value as any)?.value
 	const spo2Value = spo2Raw !== undefined && spo2Raw !== null ? String(spo2Raw) : null
 	const tempValue = tempRecord ? String((tempRecord.value as any)?.temperature ?? '--') : null
-	const spo2Low = spo2Value ? Number(spo2Value) < VITAL_THRESHOLDS.spo2LowPercent : false
+	// How each shows: the backend's `rating` of the record (normal / medium / high; there is no cut-off in the app).
+	const bpRating = ratingOf(bpRecord)
+	const glucoseRating = ratingOf(glucoseRecord)
+	const pulseRating = ratingOf(latestVitals.pulse)
+	const spo2TempRating = worstRating(ratingOf(spo2Record), ratingOf(tempRecord))
 
 	const hasAnyVitals = !!(bpRecord || glucoseRecord || spo2Record || tempRecord || pulseValue)
 
@@ -1071,15 +1077,14 @@ function DoctorConsultation() {
 							<Text style={styles.sectionTitle}>Vitals today</Text>
 							{hasAnyVitals ? (
 								<View style={styles.vitalsGrid}>
-									<VitalCard label="Blood pressure" value={bpValue ? `${bpValue} ` : '-- '} unit="mmHg" tone={bpHigh ? 'amber' : 'green'} toneLabel={bpHigh ? 'Above target' : 'Normal'} show={!!bpValue} />
-									<VitalCard label="Random sugar" value={glucoseValue ? `${glucoseValue} ` : '-- '} unit="mg/dL" tone={glucoseHigh ? 'red' : 'green'} toneLabel={glucoseHigh ? 'High' : 'Normal'} show={!!glucoseValue} />
-									<VitalCard label="Pulse" value={pulseValue ? `${pulseValue} ` : '-- '} unit="bpm" tone="green" toneLabel="Normal" show={!!pulseValue} />
+									<VitalCard label="Blood pressure" value={bpValue ? `${bpValue} ` : '-- '} unit="mmHg" {...toneOfRating(bpRating)} show={!!bpValue} />
+									<VitalCard label="Random sugar (RBS)" value={glucoseValue ? `${glucoseValue} ` : '-- '} unit="mg/dL" {...toneOfRating(glucoseRating)} show={!!glucoseValue} />
+									<VitalCard label="Pulse" value={pulseValue ? `${pulseValue} ` : '-- '} unit="bpm" {...toneOfRating(pulseRating)} show={!!pulseValue} />
 									<VitalCard
 										label="SpO₂ · Temp"
 										value={`${spo2Value ?? '--'}% · ${tempValue ?? '--'}°F`}
 										unit=""
-										tone={spo2Low ? 'amber' : 'green'}
-										toneLabel={spo2Low ? 'Low' : 'Normal'}
+										{...toneOfRating(spo2TempRating)}
 										show={!!(spo2Value || tempValue)}
 									/>
 								</View>
@@ -1529,6 +1534,7 @@ function DoctorConsultation() {
 				visible={vitals.sheet.visible}
 				patientName={patient?.name ?? ''}
 				initial={vitals.sheet.initial}
+				ranges={vitals.sheet.ranges}
 				saving={vitals.sheet.saving}
 				onClose={vitals.sheet.close}
 				onSave={vitals.sheet.save}
@@ -1554,6 +1560,14 @@ function DoctorConsultation() {
 
 // ── Small presentational pieces ─────────────────────────────────────────────
 
+/** The chip of a vital card for a rating: green Normal, amber Medium, red High; none when there is no rating. */
+function toneOfRating(rating: VitalRating): { tone?: 'green' | 'amber' | 'red'; toneLabel?: string } {
+	if (rating === 'normal') return { tone: 'green', toneLabel: 'Normal' }
+	if (rating === 'medium') return { tone: 'amber', toneLabel: 'Medium' }
+	if (rating === 'high') return { tone: 'red', toneLabel: 'High' }
+	return {}
+}
+
 function VitalCard({
 	label,
 	value,
@@ -1565,12 +1579,18 @@ function VitalCard({
 	label: string
 	value: string
 	unit: string
-	tone: 'green' | 'amber' | 'red'
-	toneLabel: string
+	/** Absent when the reading has no rating: the card then shows no chip. */
+	tone?: 'green' | 'amber' | 'red'
+	toneLabel?: string
 	show: boolean
 }) {
 	if (!show) return null
-	const pair = tone === 'green' ? REPORT_TONES.green : tone === 'amber' ? REPORT_TONES.amber : { bg: APP_COLORS.dangerBg, fg: APP_COLORS.danger }
+	const pair =
+		tone === 'amber'
+			? REPORT_TONES.amber
+			: tone === 'red'
+				? { bg: APP_COLORS.dangerBg, fg: APP_COLORS.danger }
+				: REPORT_TONES.green
 	return (
 		<View style={styles.vitalCard}>
 			<Text style={styles.vitalLabel}>{label}</Text>
@@ -1578,9 +1598,11 @@ function VitalCard({
 				{value}
 				{!!unit && <Text style={styles.vitalUnit}> {unit}</Text>}
 			</Text>
-			<View style={[styles.vitalToneChip, { backgroundColor: pair.bg }]}>
-				<Text style={[styles.vitalToneText, { color: pair.fg }]}>{toneLabel}</Text>
-			</View>
+			{!!tone && (
+				<View style={[styles.vitalToneChip, { backgroundColor: pair.bg }]}>
+					<Text style={[styles.vitalToneText, { color: pair.fg }]}>{toneLabel}</Text>
+				</View>
+			)}
 		</View>
 	)
 }
