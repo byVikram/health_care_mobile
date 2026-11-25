@@ -6,9 +6,9 @@
 // created (`onSaved`) and the card follows from that data, so there is no separate "recorded" flag to keep in step and the card does
 // not depend on a second request succeeding.
 
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Toast from 'react-native-toast-message'
-import { recordVitals, type VitalRecord } from './VitalsService'
+import { getVitalRanges, recordVitals, type VitalRanges, type VitalRecord } from './VitalsService'
 import {
 	buildVitalChips,
 	buildVitalEntries,
@@ -47,12 +47,15 @@ export function useRecordVitals({
 	onSaved,
 }: Options) {
 	const today = useMemo(() => todaysVitals(recentVitals), [recentVitals])
-	const chips = useMemo(() => buildVitalChips(today.values), [today])
+	const chips = useMemo(() => buildVitalChips(today.values, today.ratings), [today])
 	const flags = useMemo(() => flagSummary(chips), [chips])
 	const lastReading = useMemo(() => describeLastReading(latestVitals), [latestVitals])
 
 	const [visible, setVisible] = useState(false)
 	const [saving, setSaving] = useState(false)
+	// The backend's bands, fetched the first time the sheet opens (the colours of a typed value). A failure leaves them null: no colour,
+	// never an error, and the next opening tries again.
+	const [ranges, setRanges] = useState<VitalRanges | null>(null)
 	// Set at once on the first tap: `saving` only changes on the next render, so a quick double tap could still send twice.
 	const inFlight = useRef(false)
 
@@ -72,6 +75,22 @@ export function useRecordVitals({
 	}, [recentLoad, onRetryRecent])
 
 	const close = useCallback(() => setVisible(false), [])
+
+	useEffect(() => {
+		if (!visible || ranges) return
+		let active = true
+		;(async () => {
+			try {
+				const loaded = await getVitalRanges()
+				if (active && Object.keys(loaded).length) setRanges(loaded)
+			} catch {
+				// no colour while typing; the readings themselves are still checked and rated by the backend
+			}
+		})()
+		return () => {
+			active = false
+		}
+	}, [visible, ranges])
 
 	const save = useCallback(
 		async (draft: VitalValues) => {
@@ -135,6 +154,6 @@ export function useRecordVitals({
 	return {
 		recorded,
 		openSheet: open,
-		sheet: { visible, initial: today.values, saving, close, save },
+		sheet: { visible, initial: today.values, ranges, saving, close, save },
 	}
 }

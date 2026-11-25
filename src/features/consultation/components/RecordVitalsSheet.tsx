@@ -1,6 +1,6 @@
 // src/features/consultation/components/RecordVitalsSheet.tsx
 //
-// "Record vitals" bottom sheet (design variant B): the patient and the day, the six readings as a 2-column grid, a short key for
+// "Record vitals" bottom sheet (design variant B): the patient and the day, the readings (BP, pulse, SpO₂, temperature, RBS, weight, height) as a 2-column grid, a short key for
 // the range dots and one Save button that says how many readings are in. The sheet owns the draft being typed (so a keystroke
 // re-renders only the sheet); the page's useRecordVitals hook owns the save.
 
@@ -12,10 +12,12 @@ import {
 	RATING_TONES,
 	VITAL_FIELDS,
 	countFilled,
+	rateTyped,
 	toNumberText,
 	type VitalFieldId,
 	type VitalValues,
 } from '../vitalsEntry'
+import type { VitalRanges } from '../VitalsService'
 import { VitalFieldTile } from './VitalFieldTile'
 
 type Props = {
@@ -23,12 +25,14 @@ type Props = {
 	patientName: string
 	/** What is recorded today: the sheet opens on it, and the fields not yet touched follow it if it changes while open. */
 	initial: VitalValues
+	/** The backend's bands, to colour a field as it is typed; null while unknown (or when the request failed): no colour then. */
+	ranges: VitalRanges | null
 	saving: boolean
 	onClose: () => void
 	onSave: (draft: VitalValues) => void
 }
 
-export function RecordVitalsSheet({ visible, patientName, initial, saving, onClose, onSave }: Props) {
+export function RecordVitalsSheet({ visible, patientName, initial, ranges, saving, onClose, onSave }: Props) {
 	const [draft, setDraft] = useState<VitalValues>(initial)
 	const startedFrom = useRef<VitalValues>(initial)
 
@@ -89,16 +93,19 @@ export function RecordVitalsSheet({ visible, patientName, initial, saving, onClo
 						key={field.id}
 						field={field}
 						value={draft[field.id]}
+						rating={rateTyped(ranges, field.id, draft[field.id])}
 						onChangeText={(text) => setField(field.id, text)}
 						style={styles.cell}
 					/>
 				))}
 			</View>
 			<View style={styles.key}>
+				<View style={[styles.keyDot, { backgroundColor: RATING_TONES.normal.dot }]} />
+				<Text style={styles.keyText}>Normal</Text>
+				<View style={[styles.keyDot, { backgroundColor: RATING_TONES.medium.dot }]} />
+				<Text style={styles.keyText}>Medium</Text>
 				<View style={[styles.keyDot, { backgroundColor: RATING_TONES.high.dot }]} />
-				<Text style={styles.keyText}>Red dot = outside the normal range</Text>
-				<View style={[styles.keyDot, { backgroundColor: RATING_TONES.watch.dot }]} />
-				<Text style={styles.keyText}>Amber = borderline</Text>
+				<Text style={styles.keyText}>High</Text>
 			</View>
 		</AppBottomSheet>
 	)
