@@ -92,8 +92,7 @@ export function formatKm(distance: number): string {
 	return Number.isInteger(distance) ? String(distance) : distance.toFixed(1)
 }
 
-/** The short booking reference patients see ("KH-1A2B3C4D"): the first 8 characters of the appointment's public id. */
+/** The booking reference patients see and read out: the appointment's own public id ("7K3Q-9M2X-4D8R"), shown as it is. */
 export function bookingRef(publicId: string | null | undefined): string {
-	if (!publicId) return ''
-	return `KH-${publicId.replace(/-/g, '').slice(0, 8).toUpperCase()}`
+	return publicId ?? ''
 }

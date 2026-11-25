@@ -74,7 +74,7 @@ interface AppSidebarProps {
 	profileName?: string
 	/** Defaults to useAuth().user.avatar. */
 	avatarUri?: string | null
-	/** 12/16 600 muted line under the name, e.g. "ID · KH-000123". */
+	/** 12/16 600 muted line under the name (none by default). */
 	profileSubtitle?: string
 	/** 0-100; shows the progress bar when a number. */
 	profileCompletion?: number | null

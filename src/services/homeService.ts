@@ -129,7 +129,6 @@ export const leaveCommunity = async (groupId: string): Promise<CommunityMembersh
 
 export interface PatientSummary {
 	public_id: string
-	display_id: string
 	name: string
 	avatar_url?: string | null
 	age?: number | null

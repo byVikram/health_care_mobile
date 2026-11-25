@@ -65,8 +65,6 @@ interface MemberDraft {
 	complete: boolean
 	/** Display URL of the member's current photo ('' = none). The photo itself is saved by its own upload. */
 	avatar: string
-	/** Karola ID of the member ('' until they are saved). */
-	code: string
 	health: HealthValues
 }
 
@@ -93,7 +91,6 @@ const EMPTY: MemberDraft = {
 	mobile: '',
 	complete: false,
 	avatar: '',
-	code: '',
 	health: EMPTY_HEALTH,
 }
 
@@ -120,7 +117,6 @@ export default function FamilyMemberPage() {
 			mobile: member.contact_number || '',
 			complete: !!member.is_complete,
 			avatar: buildS3Url(member.avatar_s3_key) || '',
-			code: member.patient_code || '',
 			health: detailsToHealth(details),
 		}
 	}, [memberId])
@@ -193,7 +189,7 @@ export default function FamilyMemberPage() {
 	const title = memberId ? draft?.name || 'Family member' : 'Add family member'
 	const subtitle = memberId
 		? `${relationLabel(draft?.relation)} · ${draft?.complete ? 'profile complete' : 'details incomplete'}`
-		: 'Each member gets their own Karola ID'
+		: 'Each member keeps their own reports and prescriptions'
 
 	const handleRemove = async () => {
 		if (!memberId) return
@@ -284,7 +280,7 @@ export default function FamilyMemberPage() {
 							</Text>
 							<Text style={styles.photoSub} numberOfLines={1}>
 								{memberId
-									? `${relationLabel(draft.relation)}${draft.code ? ` · Karola ID ${draft.code}` : ''}`
+									? relationLabel(draft.relation)
 									: 'Profile photo (optional)'}
 							</Text>
 						</View>

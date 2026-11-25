@@ -111,7 +111,7 @@ export default function FamilyMembersPage() {
 				<Text style={styles.addText}>Add family member</Text>
 			</TouchableOpacity>
 			<Text style={styles.note}>
-				Each member gets their own Karola ID and QR. Their reports and prescriptions are kept separately from
+				Each member gets their own QR. Their reports and prescriptions are kept separately from
 				yours.
 			</Text>
 		</ProfileScreen>

@@ -27,7 +27,6 @@ export const timeRange = (v: Pick<ProviderVisitDetail, 'date' | 'start_time' | '
 	(v.date ? '' : 'Instant · now')
 
 /** Short booking reference shown in headers ("KH-1A2B3C4D"). */
-// export const bookingRef = (requestId: string) => `KH-${requestId.replace(/-/g, '').slice(0, 8).toUpperCase()}`
 export const bookingRef = (requestId: string) => requestId
 
 const RELATION_LABELS: Record<string, string> = {

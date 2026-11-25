@@ -1,13 +1,12 @@
 // src/features/dashboard/components/HealthQrSheet.tsx
 //
-// "My health QR" sheet (design qrOpen): mint card with the patient's avatar, name and display id, a QR code
-// encoding the patient's public id (GET /api/patients/me/summary), Save / Share actions and a privacy note.
-// react-native-view-shot isn't installed, so both actions share the patient ID as text via the OS share
-// sheet rather than the QR image. Opened with useHomeSheets().open('qr'); rendered once by <HomeSheetsHost />.
+// "My health QR" sheet (design qrOpen): mint card with the patient's avatar and name, a QR code encoding the
+// patient's public id (GET /api/patients/me/summary) and a privacy note. No id is shown as text.
+// Opened with useHomeSheets().open('qr'); rendered once by <HomeSheetsHost />.
 import React from 'react'
-import { ActivityIndicator, Share, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import QRCode from 'react-native-qrcode-svg'
-import { AppAvatar, AppBottomSheet, AppButton, AppPathIcon } from '../../../components/common'
+import { AppAvatar, AppBottomSheet, AppPathIcon } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { useAuth } from '../../../context/AuthContext'
 import { HOME_CHROME_PATHS } from '../homeChromeIcons'
@@ -26,27 +25,7 @@ export default function HealthQrSheet({ visible, onClose }: HealthQrSheetProps) 
 
 	const name = summary?.name || user?.name || 'Patient'
 	const avatarUri = summary?.avatar_url || user?.avatar || null
-	const displayId = summary?.display_id || ''
 	const qrValue = summary?.public_id || ''
-	const shareId = displayId || qrValue
-
-	const shareText = async (message: string) => {
-		try {
-			await Share.share({ title: 'My health QR', message })
-		} catch {
-			// Share sheet dismissed or unavailable; nothing to do.
-		}
-	}
-
-	const handleSave = () => {
-		void shareText(`Karolahealth patient ID: ${shareId}`)
-	}
-
-	const handleShare = () => {
-		void shareText(
-			`${name}'s Karolahealth patient ID is ${shareId}. Show it at the clinic, lab or pharmacy to open my records.`
-		)
-	}
 
 	return (
 		<AppBottomSheet
@@ -72,7 +51,6 @@ export default function HealthQrSheet({ visible, onClose }: HealthQrSheetProps) 
 							<Text style={styles.name} numberOfLines={1}>
 								{name}
 							</Text>
-							{!!displayId && <Text style={styles.patientId}>Patient ID · {displayId}</Text>}
 						</View>
 					</View>
 
@@ -80,11 +58,7 @@ export default function HealthQrSheet({ visible, onClose }: HealthQrSheetProps) 
 						style={styles.qrBox}
 						accessible
 						accessibilityRole="image"
-						accessibilityLabel={
-							qrValue
-								? `QR code for ${name}${displayId ? `, patient ID ${displayId}` : ''}`
-								: 'QR code unavailable'
-						}
+						accessibilityLabel={qrValue ? `QR code for ${name}` : 'QR code unavailable'}
 					>
 						{qrValue ? (
 							<QRCode
@@ -107,34 +81,6 @@ export default function HealthQrSheet({ visible, onClose }: HealthQrSheetProps) 
 					</View>
 
 					<Text style={styles.note}>Staff scan this to open your records and check you in.</Text>
-				</View>
-
-				<View style={styles.actions}>
-					<AppButton
-						variant="outline"
-						size="md"
-						icon="download"
-						onPress={handleSave}
-						disabled={!shareId}
-						style={styles.action}
-						contentStyle={styles.actionContent}
-						labelStyle={styles.actionLabel}
-						accessibilityLabel="Save patient ID"
-					>
-						Save
-					</AppButton>
-					<AppButton
-						size="md"
-						icon="share-variant"
-						onPress={handleShare}
-						disabled={!shareId}
-						style={styles.action}
-						contentStyle={styles.actionContent}
-						labelStyle={styles.actionLabel}
-						accessibilityLabel="Share patient ID"
-					>
-						Share
-					</AppButton>
 				</View>
 
 				<View style={styles.privacy}>
@@ -176,11 +122,6 @@ const styles = StyleSheet.create({
 		fontWeight: '800',
 		color: APP_COLORS.ink,
 	},
-	patientId: {
-		fontSize: 12,
-		lineHeight: 16,
-		color: APP_COLORS.inkMuted,
-	},
 	qrBox: {
 		padding: 12,
 		borderRadius: 12,
@@ -209,21 +150,6 @@ const styles = StyleSheet.create({
 		lineHeight: 18,
 		color: APP_COLORS.ink,
 		textAlign: 'center',
-	},
-	actions: {
-		alignSelf: 'stretch',
-		flexDirection: 'row',
-		gap: 8,
-	},
-	action: {
-		flex: 1,
-	},
-	actionContent: {
-		height: 48,
-	},
-	actionLabel: {
-		fontSize: 15,
-		fontWeight: '700',
 	},
 	privacy: {
 		flexDirection: 'row',

@@ -97,7 +97,6 @@ function PatientSidebar({ visible, onClose, onLogout, onViewProfile, sections }:
 			onEditProfile={onViewProfile}
 			profileName={summary?.name || user?.name}
 			avatarUri={summary?.avatar_url || user?.avatar || null}
-			profileSubtitle={summary?.display_id ? `ID · ${summary.display_id}` : undefined}
 			profileCompletion={summary ? summary.profile_completion : null}
 			onCompleteProfile={openProfile}
 			onOpenQr={handleOpenQr}
