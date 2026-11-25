@@ -1,10 +1,11 @@
 // src/features/appointment/components/patient-details/RescheduleSheet.tsx
 //
 // "Reschedule appointment" / "Reschedule video call" sheet (design 7 / 7a):
-// current slot struck through, 14-day date strip (the booking window), grouped time slots, and a
+// current slot, 14-day date strip (the booking window), grouped time slots, and a
 // "Confirm · {day}, {time}" footer. Slots come from getDoctorAvailability
 // (normalised with RescheduleModal's normaliser); submit uses
-// rescheduleAppointment -- same payload as RescheduleModal.
+// rescheduleAppointment -- same payload as RescheduleModal. How it ends (spinner, inline error, success toast) is the shared
+// AppRescheduleSheet's: `onRescheduled` is its follow-up once the toast is up.
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
@@ -14,6 +15,8 @@ import {
 	AppRescheduleSheet,
 	DateStrip,
 	SlotChipGrid,
+	rescheduleErrorMessage,
+	type AppRescheduleResult,
 	type SlotChipItem,
 } from '../../../../components/common'
 import { APPOINTMENT_STATUS } from '../../../../constants/constants'
@@ -35,7 +38,6 @@ import {
 	relativeDayLabel,
 } from '../../../../utils/date'
 import { formatTimeSlot } from '../../../../utils/formatters'
-import { showStatusModal } from '../../../../services/apiService'
 
 const COLS = 3
 
@@ -77,7 +79,6 @@ export default function RescheduleSheet({
 	const [groups, setGroups] = useState<SlotGroup[]>([])
 	const [loading, setLoading] = useState(false)
 	const [loadError, setLoadError] = useState(false)
-	const [submitting, setSubmitting] = useState(false)
 	// Why the patient needs another time, in their own words (optional): the doctor reads it.
 	const [reason, setReason] = useState('')
 	const [resolvedHospitalId, setResolvedHospitalId] = useState<string | null>(hospitalId ?? null)
@@ -167,9 +168,8 @@ export default function RescheduleSheet({
 			? `Confirm · ${relativeDayLabel(activeDay)}, ${formatTimeSlot(selected.start_time)}`
 			: 'Select a new time'
 
-	const handleConfirm = async () => {
-		if (!selected || !resolvedHospitalId || submitting) return
-		setSubmitting(true)
+	const handleConfirm = async (): Promise<AppRescheduleResult> => {
+		if (!selected || !resolvedHospitalId) return { ok: false, error: 'Pick a new time first.' }
 		try {
 			const res = await rescheduleAppointment({
 				appointment_id: appointmentId,
@@ -180,26 +180,11 @@ export default function RescheduleSheet({
 				reason: reason.trim() || undefined,
 				status_id: APPOINTMENT_STATUS.CONFIRM,
 			})
-			if (res?.success) {
-				onRescheduled()
-			} else {
-				showStatusModal({
-					status: 'error',
-					title: "Couldn't reschedule",
-					description: res?.message || 'Reschedule failed. Please try again.',
-					submitText: 'OK',
-				})
-			}
-		} catch (error: any) {
-			console.log('[RescheduleSheet] reschedule error:', error?.response?.data || error?.message || error)
-			showStatusModal({
-				status: 'error',
-				title: "Couldn't reschedule",
-				description: 'Please try again.',
-				submitText: 'OK',
-			})
-		} finally {
-			setSubmitting(false)
+			return res?.success
+				? { ok: true }
+				: { ok: false, error: res?.message || 'Reschedule failed. Please try again.' }
+		} catch (error) {
+			return { ok: false, error: rescheduleErrorMessage(error, 'Reschedule failed. Please try again.') }
 		}
 	}
 
@@ -233,8 +218,7 @@ export default function RescheduleSheet({
 			dateSection={
 				!!activeDay && (
 					<DateStrip
-						variant="grid"
-						strikeDisabled
+						variant="scroll"
 						dayCount={days.length}
 						selectedDate={activeDay}
 						onSelectDate={(d) => {
@@ -247,8 +231,9 @@ export default function RescheduleSheet({
 			note={note}
 			confirmLabel={btnLabel}
 			confirmDisabled={confirmBlocked}
-			busy={submitting}
 			onConfirm={handleConfirm}
+			successTitle="Appointment rescheduled"
+			onDone={onRescheduled}
 			onClose={onClose}
 		>
 			{loading ? (
