@@ -24,7 +24,6 @@ import Toast from 'react-native-toast-message'
 import {
 	AppAppointmentRow,
 	AppConfirmSheet,
-	cancelErrorMessage,
 	sheetErrorMessage,
 	type AppCancelResult,
 	type SheetResult,
@@ -690,7 +689,7 @@ export function DoctorScheduleScreen() {
 			}))
 			return { ok: true }
 		} catch (e) {
-			return { ok: false, error: cancelErrorMessage(e, 'Please try again.') }
+			return { ok: false, error: sheetErrorMessage(e, 'Please try again.') }
 		} finally {
 			setBusyId(null)
 		}

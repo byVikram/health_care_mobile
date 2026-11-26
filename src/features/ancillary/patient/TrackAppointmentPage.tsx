@@ -17,7 +17,7 @@ import {
 	cancelCareRequestPatientBackend,
 } from '../ancillaryService'
 import CancellationDetailsModal from './CancellationDetailsModal'
-import { cancelErrorMessage, type AppCancelResult } from '../../../components/common'
+import { sheetErrorMessage, type AppCancelResult } from '../../../components/common'
 import { useVisitPolicy } from '../hooks/useVisitPolicy'
 import { dayLabel, inr, providerNoun, timeLabel } from './ancillaryBookingCopy'
 import { MissedVisitBanner } from '../components/MissedVisitBanner'
@@ -443,7 +443,7 @@ export default function TrackAppointmentPage() {
 			return { ok: true }
 		} catch (e) {
 			// Still open on the server: the sheet stays open with the reason, so the patient can try again.
-			return { ok: false, error: cancelErrorMessage(e, 'Please try again.') }
+			return { ok: false, error: sheetErrorMessage(e, 'Please try again.') }
 		}
 	}
 

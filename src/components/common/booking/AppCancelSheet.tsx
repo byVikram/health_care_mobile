@@ -73,19 +73,6 @@ export type AppCancelOk<T = unknown> = {
 }
 export type AppCancelResult<T = unknown> = AppCancelOk<T> | { ok: true; carryOn: true } | { ok: false; error: string }
 
-/** A readable message from a failed cancel call (the server's `message`, a `detail` string or `detail.message`), else `fallback`. */
-export function cancelErrorMessage(error: unknown, fallback = 'Please try again.'): string {
-	const data = (error as { response?: { data?: { message?: unknown; detail?: unknown } } } | null)?.response?.data
-	const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
-	const detail = data?.detail as { message?: unknown } | string | undefined
-	return (
-		text(data?.message) ??
-		text(typeof detail === 'string' ? detail : undefined) ??
-		text(typeof detail === 'object' ? detail?.message : undefined) ??
-		fallback
-	)
-}
-
 export type AppCancelSheetProps<T = unknown> = {
 	visible: boolean
 	title: string

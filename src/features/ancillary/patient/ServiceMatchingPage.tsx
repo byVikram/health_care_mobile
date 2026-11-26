@@ -32,7 +32,7 @@ import {
 	AppButton,
 	AppFooterBar,
 	AppNumberedSteps,
-	cancelErrorMessage,
+	sheetErrorMessage,
 	type AppCancelResult,
 } from '../../../components/common'
 import { fetchPatientActiveRequestBackend, cancelCareRequestPatientBackend } from '../ancillaryService'
@@ -300,7 +300,7 @@ export default function ServiceMatchingPage() {
 			await cancelCareRequestPatientBackend(bookingId, reason)
 			return { ok: true }
 		} catch (e) {
-			return { ok: false, error: cancelErrorMessage(e, 'Please try again.') }
+			return { ok: false, error: sheetErrorMessage(e, 'Please try again.') }
 		}
 	}
 
