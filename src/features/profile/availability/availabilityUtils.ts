@@ -90,6 +90,18 @@ export const dayRanges = (day: DaySections): TimeRange[] => SECTION_KEYS.flatMap
 
 export const isDayOn = (day: DaySections) => dayRanges(day).length > 0
 
+/** `ranges` with the window [from, to) (minutes from midnight) cut out; pieces keep their original start/end. */
+export const subtractBreak = (ranges: TimeRange[], from: number, to: number): TimeRange[] =>
+	ranges.flatMap((r) => {
+		const s = toMinutes(r.start)
+		const e = toMinutes(r.end)
+		if (to <= s || from >= e) return [r]
+		const out: TimeRange[] = []
+		if (from > s) out.push({ start: r.start, end: toHHMM(from) })
+		if (to < e) out.push({ start: toHHMM(to), end: r.end })
+		return out
+	})
+
 /** "9 AM–12 PM, 2–5 PM" or "Unavailable". */
 export const daySummary = (day: DaySections): string => {
 	const ranges = dayRanges(day)

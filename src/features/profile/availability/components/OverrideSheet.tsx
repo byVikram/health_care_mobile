@@ -1,5 +1,5 @@
-// Add / edit a date override: pick a date (next 3 weeks), then "Unavailable all day" / "On leave" or
-// "Different hours" (Morning / Afternoon / Evening ranges that replace that day's weekly hours), and an
+// Add / edit a special day: pick a date (next 3 weeks), then "Unavailable all day" / "On leave", "Take a break"
+// (the weekly hours minus a window) or "Change my hours" (Morning / Afternoon / Evening ranges that replace that day's weekly hours), and an
 // optional note (ancillary only -- the doctor backend has no note on overrides).
 
 import React, { useEffect, useState } from 'react'
@@ -10,13 +10,17 @@ import {
 	DAY_SHORT,
 	dayRanges,
 	emptyDay,
+	formatRange,
 	rangeError,
 	sectionForStart,
 	SECTION_KEYS,
+	subtractBreak,
 	toIsoDate,
+	toMinutes,
 	upcomingDates,
 	type DateOverride,
 	type DaySections as DaySectionsValue,
+	type TimeRange,
 } from '../availabilityUtils'
 import { DaySections } from './DaySections'
 
@@ -30,6 +34,8 @@ export type OverrideSheetProps = {
 	offLabel: string
 	subtitle: string
 	allowNote: boolean
+	/** The weekly ranges that apply on a date (YYYY-MM-DD). Given = the "Take a break" option is offered. */
+	weeklyRanges?: (iso: string) => TimeRange[]
 	/** Confirmed visits already booked per date (YYYY-MM-DD): shows a warning when the date has some. */
 	bookedByDate?: Record<string, number>
 	onSave: (o: Pick<DateOverride, 'date' | 'off' | 'ranges' | 'note'>) => Promise<void>
@@ -49,12 +55,14 @@ export function OverrideSheet({
 	offLabel,
 	subtitle,
 	allowNote,
+	weeklyRanges,
 	bookedByDate,
 	onSave,
 }: OverrideSheetProps) {
 	const dates = upcomingDates(21)
 	const [date, setDate] = useState('')
-	const [off, setOff] = useState(true)
+	const [mode, setMode] = useState<'off' | 'hours' | 'break'>('off')
+	const [breaks, setBreaks] = useState<DaySectionsValue>(emptyDay())
 	const [day, setDay] = useState<DaySectionsValue>(emptyDay())
 	const [note, setNote] = useState('')
 	const [saving, setSaving] = useState(false)
@@ -63,19 +71,46 @@ export function OverrideSheet({
 		if (!visible) return
 		const firstFree = dates.map(toIsoDate).find((d) => !takenDates.includes(d)) ?? toIsoDate(dates[0])
 		setDate(initial?.date ?? firstFree)
-		setOff(initial ? initial.off : true)
+		setMode(initial && !initial.off ? 'hours' : 'off')
 		setDay(toDay(initial))
+		setBreaks(emptyDay())
 		setNote(initial?.note ?? '')
 	}, [visible])
 
+	const off = mode === 'off'
 	const booked = bookedByDate?.[date] ?? 0
 	const hasErrors = SECTION_KEYS.some((k) => day[k].some((_, i) => rangeError(day, k, i) !== null))
-	const canSave = !!date && (off || (dayRanges(day).length > 0 && !hasErrors)) && !saving
+
+	// "Take a break": the date's weekly hours with every chosen break cut out
+	const weekly = weeklyRanges?.(date) ?? []
+	const breakRanges = dayRanges(breaks)
+	const breakHasErrors = SECTION_KEYS.some((k) => breaks[k].some((_, i) => rangeError(breaks, k, i) !== null))
+	const afterBreak = breakRanges.reduce(
+		(left, r) => subtractBreak(left, toMinutes(r.start), toMinutes(r.end)),
+		weekly
+	)
+	const breakValid =
+		breakRanges.length > 0 &&
+		!breakHasErrors &&
+		afterBreak.length > 0 &&
+		JSON.stringify(afterBreak) !== JSON.stringify(weekly)
+
+	const canSave =
+		!!date &&
+		!saving &&
+		(mode === 'off' ||
+			(mode === 'hours' && dayRanges(day).length > 0 && !hasErrors) ||
+			(mode === 'break' && breakValid))
 
 	const save = async () => {
 		setSaving(true)
 		try {
-			await onSave({ date, off, ranges: off ? [] : dayRanges(day), note: note.trim() || undefined })
+			await onSave({
+				date,
+				off,
+				ranges: mode === 'off' ? [] : mode === 'break' ? afterBreak : dayRanges(day),
+				note: note.trim() || undefined,
+			})
 		} finally {
 			setSaving(false)
 		}
@@ -85,7 +120,7 @@ export function OverrideSheet({
 		<AppBottomSheet
 			visible={visible}
 			onClose={onClose}
-			title={initial ? 'Edit date override' : 'Add date override'}
+			title={initial ? 'Edit special day' : 'Add a special day'}
 			subtitle={subtitle}
 			appearance="modern"
 			showHeaderDivider={false}
@@ -93,7 +128,7 @@ export function OverrideSheet({
 			maxHeightRatio={0.92}
 			footer={
 				<AppButton variant="primary" size="lg" softDisabled onPress={save} disabled={!canSave} loading={saving}>
-					Save override
+					Save
 				</AppButton>
 			}
 		>
@@ -135,14 +170,22 @@ export function OverrideSheet({
 					<AppRadioCard
 						title={offLabel}
 						subtitle="No bookings on this date"
-						selected={off}
-						onPress={() => setOff(true)}
+						selected={mode === 'off'}
+						onPress={() => setMode('off')}
 					/>
+					{weeklyRanges && (
+						<AppRadioCard
+							title="Take a break"
+							subtitle="Block part of the day, e.g. 10–11 AM"
+							selected={mode === 'break'}
+							onPress={() => setMode('break')}
+						/>
+					)}
 					<AppRadioCard
-						title="Different hours"
-						subtitle="Replace this day’s weekly hours"
-						selected={!off}
-						onPress={() => setOff(false)}
+						title="Change my hours"
+						subtitle="Start or finish at a different time on this day"
+						selected={mode === 'hours'}
+						onPress={() => setMode('hours')}
 					/>
 				</View>
 
@@ -155,7 +198,32 @@ export function OverrideSheet({
 					/>
 				)}
 
-				{!off && (
+				{mode === 'break' && (
+					<>
+						<Text style={styles.label}>Time off during the day</Text>
+						{weekly.length ? (
+							<>
+								<Text style={styles.hint}>
+									Your hours that day: {weekly.map(formatRange).join(', ')}
+								</Text>
+								<DaySections day={breaks} onChange={setBreaks} />
+								<Text style={styles.hint}>
+									{breakValid
+										? `You'll be available ${afterBreak.map(formatRange).join(', ')} on this day.`
+										: breakRanges.length && !breakHasErrors && afterBreak.length === 0
+											? `That break covers all your hours. Choose "${offLabel}" instead.`
+											: 'Add the time you need off, inside your hours for this day.'}
+								</Text>
+							</>
+						) : (
+							<Text style={styles.hint}>
+								You have no weekly hours on this day, so there is nothing to take a break from.
+							</Text>
+						)}
+					</>
+				)}
+
+				{mode === 'hours' && (
 					<>
 						<Text style={styles.label}>Hours for this date</Text>
 						<DaySections day={day} onChange={setDay} />
@@ -224,6 +292,11 @@ const styles = StyleSheet.create({
 	},
 	modes: {
 		gap: 8,
+	},
+	hint: {
+		fontSize: 13,
+		lineHeight: 18,
+		color: APP_COLORS.inkMuted,
 	},
 })
 

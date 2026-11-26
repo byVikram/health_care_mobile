@@ -4,44 +4,39 @@
 
 import React from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { APP_COLORS } from '../../../../config/theme'
+import { APP_COLORS, CARD_SHADOW } from '../../../../config/theme'
+import AppToggle from '../../../../components/common/inputs/AppToggle'
 import { formatUnit } from '../../config/ancillaryProfileConfig'
-
-// the design's "primary soft strong" tint, used for the card's border and divider
-const SOFT_STRONG = '#C9E0E0'
 
 export type SlotLengthCardProps = {
 	/** Slot lengths in minutes, e.g. [10, 15, 20, 30]. */
 	options: number[]
 	value: number | undefined
 	onChange: (minutes: number) => void
-	copyLabel: string
-	onCopy: () => void
-	/** The selected day has no hours: there is nothing to copy. */
-	copyDisabled?: boolean
+	/** One set of hours for Monday to Friday. */
+	sameHours: boolean
+	onSameHoursChange: (on: boolean) => void
 	title?: string
+	subtitle?: string
 }
 
 export function SlotLengthCard({
 	options,
 	value,
 	onChange,
-	copyLabel,
-	onCopy,
-	copyDisabled = false,
-	title = 'Slot length at this clinic',
+	sameHours,
+	onSameHoursChange,
+	title = 'Slot length',
+	subtitle = 'How long each booking lasts at this clinic',
 }: SlotLengthCardProps) {
 	return (
 		<View style={styles.card}>
-			<View style={styles.head}>
-				<MaterialCommunityIcons name="clock-outline" size={16} color={APP_COLORS.primary} />
-				<Text style={styles.title} accessibilityRole="header">
-					{title}
-				</Text>
-			</View>
+			<Text style={styles.title} accessibilityRole="header">
+				{title}
+			</Text>
+			<Text style={styles.subtitle}>{subtitle}</Text>
 
-			<View style={styles.pills} accessibilityRole="radiogroup" accessibilityLabel={title}>
+			<View style={styles.track} accessibilityRole="radiogroup" accessibilityLabel={title}>
 				{options.map((minutes) => {
 					const selected = minutes === value
 					return (
@@ -62,91 +57,92 @@ export function SlotLengthCard({
 
 			<View style={styles.divider} />
 
-			<TouchableOpacity
-				style={[styles.copy, copyDisabled && styles.copyDisabled]}
-				onPress={onCopy}
-				disabled={copyDisabled}
-				activeOpacity={0.85}
-				accessibilityRole="button"
-				accessibilityState={{ disabled: copyDisabled }}
-			>
-				<MaterialCommunityIcons name="content-copy" size={16} color={APP_COLORS.primary} />
-				<Text style={styles.copyText} numberOfLines={1}>
-					{copyLabel}
-				</Text>
-			</TouchableOpacity>
+			<View style={styles.copyRow}>
+				<View style={styles.copyInfo}>
+					<Text style={styles.copyTitle}>Same hours Mon–Fri</Text>
+					<Text style={styles.subtitle}>One set of hours for Monday to Friday</Text>
+				</View>
+				<AppToggle
+					value={sameHours}
+					onValueChange={onSameHoursChange}
+					accessibilityLabel="Same hours Monday to Friday"
+				/>
+			</View>
 		</View>
 	)
 }
 
 const styles = StyleSheet.create({
 	card: {
-		padding: 12,
-		gap: 12,
-		borderRadius: 12,
+		padding: 16,
+		gap: 4,
+		borderRadius: 20,
 		borderWidth: 1,
-		borderColor: SOFT_STRONG,
-		backgroundColor: APP_COLORS.mint,
-	},
-	head: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
+		borderColor: APP_COLORS.divider,
+		backgroundColor: APP_COLORS.surface,
+		...CARD_SHADOW,
 	},
 	title: {
-		fontSize: 14,
-		lineHeight: 20,
+		fontSize: 17,
+		lineHeight: 24,
 		fontWeight: '800',
 		color: APP_COLORS.ink,
 	},
-	pills: {
+	subtitle: {
+		fontSize: 13,
+		lineHeight: 18,
+		color: APP_COLORS.inkMuted,
+	},
+	track: {
 		flexDirection: 'row',
-		gap: 8,
+		marginTop: 12,
+		padding: 4,
+		borderRadius: 999,
+		borderWidth: 1,
+		borderColor: APP_COLORS.divider,
+		backgroundColor: APP_COLORS.pageBg,
 	},
 	pill: {
 		flex: 1,
-		height: 40,
-		borderRadius: 10,
+		height: 44,
+		borderRadius: 999,
 		alignItems: 'center',
 		justifyContent: 'center',
-		backgroundColor: APP_COLORS.surface,
 	},
 	pillOn: {
-		backgroundColor: APP_COLORS.primary,
+		backgroundColor: APP_COLORS.surface,
+		shadowColor: APP_COLORS.shadow,
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.12,
+		shadowRadius: 6,
+		elevation: 2,
 	},
 	pillText: {
 		fontSize: 14,
 		lineHeight: 20,
 		fontWeight: '700',
-		color: APP_COLORS.ink,
+		color: APP_COLORS.inkMuted,
 	},
 	pillTextOn: {
-		color: '#FFFFFF',
+		color: APP_COLORS.ink,
 	},
 	divider: {
 		height: 1,
-		backgroundColor: SOFT_STRONG,
+		marginVertical: 12,
+		backgroundColor: APP_COLORS.divider,
 	},
-	copy: {
-		height: 44,
+	copyRow: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 8,
-		paddingHorizontal: 12,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: APP_COLORS.primary,
-		backgroundColor: APP_COLORS.surface,
+		gap: 12,
 	},
-	copyDisabled: {
-		opacity: 0.5,
+	copyInfo: {
+		flex: 1,
 	},
-	copyText: {
-		flexShrink: 1,
-		fontSize: 14,
-		lineHeight: 20,
-		fontWeight: '700',
+	copyTitle: {
+		fontSize: 15,
+		lineHeight: 22,
+		fontWeight: '800',
 		color: APP_COLORS.ink,
 	},
 })
