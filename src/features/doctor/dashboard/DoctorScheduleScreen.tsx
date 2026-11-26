@@ -12,7 +12,7 @@
 //   Past         a date range (Yesterday / 7 days / 30 days / 3 months / custom), a name search and a Status + Visit-type filter
 //                sheet, rows grouped by day with "N of M seen".
 // All of it is wired to the real appointments API. Reschedule never picks a slot for the doctor: it asks the PATIENT to choose a
-// new time (AskPatientRescheduleSheet); Refer reuses the real referral service (ReferDoctorSheet).
+// new time (DoctorActionSheet); Refer reuses the real referral service (the same DoctorActionSheet, with a doctor list).
 // Not drawn because nothing behind them exists yet: the booking requests' 6-hour answer window, the call-patient action, a
 // clinic-closed day on the strip.
 
@@ -25,7 +25,9 @@ import {
 	AppAppointmentRow,
 	AppConfirmSheet,
 	cancelErrorMessage,
+	sheetErrorMessage,
 	type AppCancelResult,
+	type SheetResult,
 	AppEmptyCard,
 	AppPathIcon,
 	AppSearchBar,
@@ -50,17 +52,21 @@ import { ScheduleRow, type RowAction, type RowChip } from './ScheduleRow'
 import { DayProgress, RequestsBanner } from './ScheduleParts'
 import { AutoConfirmCard } from './AutoConfirmCard'
 import { BookingRequestsView, requestWho } from './BookingRequestsView'
-import { DeclineRequestSheet, ReferDoctorSheet, RequestActionsSheet } from './RequestSheets'
+import { DeclineRequestSheet, RequestActionsSheet } from './RequestSheets'
 import { useStartConsultation } from './useStartConsultation'
 import { TodayActionSheet, type TodaySheetMode } from './TodayActionSheet'
 import { askPatientToReschedule, getAllAppointments, getAutoConfirm, getStatusIdByLabel, markAppointmentNoShow, setAppointmentCheckIn, setAutoConfirm } from '../doctorService'
 import { updateAppointmentsStatus } from '../../../services/appointmentService'
-import { AskPatientRescheduleSheet } from '../components/AskPatientRescheduleSheet'
+import {
+	DoctorActionSheet,
+	REQUEST_RESCHEDULE_REASONS,
+	RESCHEDULE_REASONS,
+	type DoctorActionInput,
+} from '../components/DoctorActionSheet'
 import { createReferral, type Referral } from '../../referrals/referralService'
 import { byDateTime, fetchWaitingRequests } from '../waitingRequests'
 import { clinicTodayIso, dateLabelOf, effectiveStatusLabel, formatMinutes, formatTime12h, humanizeStatus, isAccepted, isCompletedAppt, isPending, isRequestLike, isNoShowAppt, isRescheduleNeeded, isUrgentRequest, isVideoMode, MON_SHORT, minutesUntilStart, NO_SHOW_SOURCE_STATUSES, noShowWindow, rowStatusTone, statusLabelOf, toApiDate } from '../scheduleUtils'
 import type { Appointment } from '../../../types/appointment'
-import type { FavouriteDoctorListItem } from '../search/components/FavouriteDoctorList'
 import { showStatusModal } from '../../../services/apiService'
 
 /** The day list, or the full-page Booking requests. */
@@ -728,9 +734,9 @@ export function DoctorScheduleScreen() {
 
 	// Doctor "reschedule": no slot is chosen here. The patient is asked to pick the new time (status becomes
 	// reschedule_required, the patient is emailed) and the doctor confirms the slot they choose later.
-	const handleAskReschedule = async (reason: string) => {
+	const handleAskReschedule = async ({ message: reason }: DoctorActionInput): Promise<SheetResult> => {
 		const apt = askTarget
-		if (!apt) return
+		if (!apt) return { ok: false, error: 'Please try again.' }
 		setBusyId(apt.id)
 		try {
 			const res = await askPatientToReschedule(apt.id, reason)
@@ -749,31 +755,25 @@ export function DoctorScheduleScreen() {
 				setTodayList(patch)
 				setUpList(patch)
 				setFutureRows(patch)
-				Toast.show({ type: 'success', text1: res.message ?? 'The patient has been asked to choose a new time' })
-				setAskTarget(null)
 				if (isRequestLike(apt)) afterRequestHandled(apt)
-			} else {
-				showStatusModal({
-					status: 'error',
-					title: "Couldn't ask the patient to reschedule",
-					description: res.message ?? 'Could not ask the patient to reschedule. Please try again.',
-					submitText: 'OK',
-				})
+				// The sheet says it in a toast and closes (onDone).
+				return { ok: true, title: res.message ?? undefined }
 			}
-		} catch (error: any) {
-			showStatusModal({
-				status: 'error',
-				title: "Couldn't ask the patient to reschedule",
-				description: error?.response?.data?.message ?? 'Could not ask the patient to reschedule. Please try again.',
-				submitText: 'OK',
-			})
+			return { ok: false, error: res.message ?? 'Could not ask the patient to reschedule. Please try again.' }
+		} catch (error) {
+			return {
+				ok: false,
+				error: sheetErrorMessage(error, 'Could not ask the patient to reschedule. Please try again.'),
+			}
 		} finally {
 			setBusyId(null)
 		}
 	}
 
-	const handleConfirmRefer = async (doctor: FavouriteDoctorListItem, notes: string) => {
-		if (!reqSheet) return
+	// Returns how the referral went; the refer sheet shows the spinner, the "Referred to ..." toast and any failure inline, and its
+	// onDone (afterRequestHandled) closes the sheets and refreshes the lists.
+	const handleConfirmRefer = async ({ message: notes, doctor }: DoctorActionInput): Promise<SheetResult> => {
+		if (!reqSheet || !doctor) return { ok: false, error: 'Please try again.' }
 		const apt = reqSheet.appt
 		setBusyId(apt.id)
 		try {
@@ -782,15 +782,9 @@ export function DoctorScheduleScreen() {
 				...prev,
 				[apt.id]: { kind: 'refer', title: `Referred to ${doctor.name}`, sub: notes || 'No notes added', tone: 'purple' },
 			}))
-			Toast.show({ type: 'success', text1: `Referred to ${doctor.name}` })
-			afterRequestHandled(apt)
-		} catch {
-			showStatusModal({
-				status: 'error',
-				title: "Couldn't refer the appointment",
-				description: 'Failed to refer appointment. Please try again.',
-				submitText: 'OK',
-			})
+			return { ok: true }
+		} catch (error) {
+			return { ok: false, error: sheetErrorMessage(error, 'Failed to refer the appointment. Please try again.') }
 		} finally {
 			setBusyId(null)
 		}
@@ -1267,24 +1261,49 @@ export function DoctorScheduleScreen() {
 						onDeclined={() => afterRequestHandled(reqSheet.appt)}
 						onChooseDoctor={() => setReqSheet({ kind: 'refer', appt: reqSheet.appt })}
 					/>
-					<ReferDoctorSheet
+					<DoctorActionSheet
 						visible={reqSheet.kind === 'refer'}
-						who={requestWho3(reqSheet.appt)}
-						firstName={(reqSheet.appt.patient?.name ?? 'The patient').split(' ')[0]}
-						busy={busyId === reqSheet.appt.id}
+						title="Refer to another doctor"
+						subtitle="The patient gets the doctor’s profile and can book directly."
+						pickDoctor
+						notice="The request closes as Referred. The patient is notified with the doctor’s profile."
+						confirmLabel="Select a doctor"
+						pickedConfirmLabel={(doctor) => `Refer to ${doctor.name}`}
+						successTitle={(doctor) => (doctor ? `Referred to ${doctor.name}` : 'Referred')}
+						onConfirm={handleConfirmRefer}
+						onDone={() => afterRequestHandled(reqSheet.appt)}
 						onClose={() => setReqSheet(null)}
-						onRefer={handleConfirmRefer}
 					/>
 				</>
 			)}
 
-			<AskPatientRescheduleSheet
+			{/* The doctor does not pick a slot: the patient is asked to (a booked appointment, or a booking request). */}
+			<DoctorActionSheet
 				visible={!!askTarget}
-				variant={askTarget && isRequestLike(askTarget) ? 'request' : 'appointment'}
-				patientName={askTarget?.patient?.name ?? 'The patient'}
+				title={askTarget && isRequestLike(askTarget) ? 'Ask for another time' : 'Ask to reschedule'}
+				subtitle={
+					askTarget && isRequestLike(askTarget)
+						? 'You won’t pick the time. The patient chooses a new slot from your open ones.'
+						: 'The patient picks a new slot that suits them'
+				}
 				slotLabel={askTarget ? `${slotLabelOf(askTarget, true)} · ${isVideoMode(askTarget.appointment_mode) ? 'Video' : 'In-clinic'}` : undefined}
-				onClose={() => setAskTarget(null)}
+				reasons={askTarget && isRequestLike(askTarget) ? REQUEST_RESCHEDULE_REASONS : RESCHEDULE_REASONS}
+				messagePlaceholder={
+					askTarget && isRequestLike(askTarget)
+						? 'e.g. Evenings after 6 PM work best this week'
+						: 'Add a short note'
+				}
+				notice={
+					askTarget && isRequestLike(askTarget)
+						? 'The request shows as Reschedule requested until the patient picks a slot. It then comes back here to confirm.'
+						: 'The patient is emailed right away and asked to choose a new time. You’ll be asked to confirm the time they pick.'
+				}
+				confirmLabel={askTarget && isRequestLike(askTarget) ? 'Send to patient' : 'Send reschedule request'}
+				keepLabel={askTarget && isRequestLike(askTarget) ? undefined : 'Keep appointment'}
+				successTitle="The patient has been asked to choose a new time"
 				onConfirm={handleAskReschedule}
+				onDone={() => setAskTarget(null)}
+				onClose={() => setAskTarget(null)}
 			/>
 		</View>
 	)

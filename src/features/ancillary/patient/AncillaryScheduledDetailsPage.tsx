@@ -90,7 +90,7 @@ export default function AncillaryScheduledDetailsPage() {
 	const { requestId } = route.params
 
 	const { order, loading, failures, pollStalled, refresh, retry } = useScheduledOrder(requestId)
-	const { moving, cancelVisits, moveVisit } = useVisitEdits(requestId, refresh)
+	const { cancelVisits, moveVisit } = useVisitEdits(requestId, refresh)
 	const [cancelOpen, setCancelOpen] = useState(false)
 	const [movingId, setMovingId] = useState<string | null>(null)
 	const [legacyOpen, setLegacyOpen] = useState(false)
@@ -455,11 +455,9 @@ export default function AncillaryScheduledDetailsPage() {
 						.map((o) => o.date)}
 					leadMinutes={policy.assign_lead_minutes}
 					noun={noun}
-					busy={moving}
 					onClose={() => setMovingId(null)}
-					onConfirm={async (date, startTime) => {
-						if (await moveVisit(movingVisit.visit_public_id, date, startTime)) setMovingId(null)
-					}}
+					onConfirm={(date, startTime) => moveVisit(movingVisit.visit_public_id, date, startTime)}
+					onDone={() => setMovingId(null)}
 				/>
 			)}
 		</View>

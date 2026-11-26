@@ -3,12 +3,19 @@
 // "Reschedule visit N" (design: Later · 3 · Booking details), built on the shared AppRescheduleSheet like the
 // appointment reschedule: the current slot, a 14-day DateStrip (days that already have another visit of this booking
 // are greyed with a dot), the hourly slots, a note that only this visit moves and a "Move to <day>, <time>" button
-// that stays grey until something new is picked. The caller runs the reschedule (`onConfirm` gets date + "HH:MM").
+// that stays grey until something new is picked. The caller runs the reschedule (`onConfirm` gets date + "HH:MM" and returns how it
+// went: the shared sheet shows the spinner, the inline error and the "Visit rescheduled" toast; `onDone` runs once it went through).
 
 import React, { useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { APP_COLORS } from '../../../config/theme'
-import { AppRescheduleGroup, AppRescheduleSheet, DateStrip, SlotChipGrid } from '../../../components/common'
+import {
+	AppRescheduleGroup,
+	AppRescheduleSheet,
+	DateStrip,
+	SlotChipGrid,
+	type AppRescheduleResult,
+} from '../../../components/common'
 import { formatDateForApi, fullDayLabel, monthRangeLabel, parseDateOnly } from '../../../utils/date'
 import { ANCILLARY_BOOKING_WINDOW_DAYS } from '../ancillaryProviderBookingService'
 import { leadText, timeLabel } from '../patient/ancillaryBookingCopy'
@@ -28,9 +35,11 @@ export type RescheduleVisitSheetProps = {
 	leadMinutes: number
 	/** "nurse" / "physiotherapist" ... for the note. */
 	noun: string
-	busy?: boolean
 	onClose: () => void
-	onConfirm: (date: string, startTime: string) => void
+	/** Moves the visit and returns how it went. */
+	onConfirm: (date: string, startTime: string) => Promise<AppRescheduleResult>
+	/** The visit was moved (the toast is up). */
+	onDone: () => void
 }
 
 export function RescheduleVisitSheet({
@@ -41,9 +50,9 @@ export function RescheduleVisitSheet({
 	takenDates,
 	leadMinutes,
 	noun,
-	busy = false,
 	onClose,
 	onConfirm,
+	onDone,
 }: RescheduleVisitSheetProps) {
 	// Mumbai's clock (not the phone's), re-read every 15 seconds.
 	const nowSec = secondsNowIst(useNow(15_000))
@@ -106,10 +115,13 @@ export function RescheduleVisitSheet({
 				</>
 			}
 			note={`Only this visit moves — your other visits stay as booked. Free to change until its ${noun} is assigned, ${leadText(leadMinutes)} before.`}
-			confirmLabel={busy ? 'Moving…' : confirmLabel}
+			confirmLabel={confirmLabel}
 			confirmDisabled={!ready}
-			busy={busy}
-			onConfirm={() => ready && !busy && onConfirm(date, time as string)}
+			onConfirm={async () =>
+				ready ? onConfirm(date, time as string) : { ok: false, error: 'Pick a new time first.' }
+			}
+			successTitle="Visit rescheduled"
+			onDone={onDone}
 			onClose={onClose}
 		>
 			{buildSlotGroups((m) => slotOk(date, m)).map((g) => (

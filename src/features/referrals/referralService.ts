@@ -100,7 +100,10 @@ export interface NotificationResponse {
 // ── Referral APIs ────────────────────────────────────────────────────────
 
 export const createReferral = async (payload: CreateReferralPayload): Promise<Referral> => {
-	const res = await ApiService.post<ReferralResponse>(API_ENDPOINTS.REFERRALS.CREATE, payload)
+	// The refer sheet shows a failure inline, so no global error dialog on top of it.
+	const res = await ApiService.post<ReferralResponse>(API_ENDPOINTS.REFERRALS.CREATE, payload, {
+		skipGlobalError: true,
+	})
 	return res.data.data
 }
 
