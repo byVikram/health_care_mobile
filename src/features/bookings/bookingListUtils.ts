@@ -13,7 +13,7 @@ import type {
 	BookingWhereType,
 	BookingsWhen,
 } from '../../services/bookingsService'
-import { MONTH_LONG, combineDateTime, dayDiff, formatClock, relativeDayLabel } from '../../utils/date'
+import { MONTH_LONG, combineDateTime, dayDiff, formatClock, fullDayLabel, relativeDayLabel } from '../../utils/date'
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap
 
@@ -106,8 +106,7 @@ export const patientLabel = (item: BookingItem): string | undefined => {
 
 export type BookingSection = { title: string; data: BookingItem[] }
 
-const UPCOMING_ORDER = ['TODAY', 'TOMORROW', 'LATER THIS WEEK', 'LATER', 'IN PROGRESS']
-
+// Upcoming: TODAY and TOMORROW, then one section per day by its date ("SAT 27 SEP"); IN PROGRESS (no time yet) last.
 const upcomingBucket = (item: BookingItem, now: Date) => {
 	const start = parseStartsAt(item.starts_at)
 	if (!start) return 'IN PROGRESS'
@@ -115,8 +114,7 @@ const upcomingBucket = (item: BookingItem, now: Date) => {
 	if (diff < 0) return 'IN PROGRESS'
 	if (diff === 0) return 'TODAY'
 	if (diff === 1) return 'TOMORROW'
-	if (diff <= 6) return 'LATER THIS WEEK'
-	return 'LATER'
+	return fullDayLabel(start.date, { markToday: false }).toUpperCase()
 }
 
 const pastBucket = (item: BookingItem) => {
@@ -126,7 +124,7 @@ const pastBucket = (item: BookingItem) => {
 }
 
 /**
- * Upcoming: TODAY / TOMORROW / LATER THIS WEEK (next 2-6 days) / LATER, and IN PROGRESS for items without a
+ * Upcoming: TODAY / TOMORROW, then one section per later day ("SAT 27 SEP") in date order, and IN PROGRESS for items without a
  * time. Past: one section per month ("SEPTEMBER 2026"), newest first as the server sorts them; EARLIER last.
  */
 export function groupBookings(items: BookingItem[], when: BookingsWhen, now = new Date()): BookingSection[] {
@@ -138,9 +136,13 @@ export function groupBookings(items: BookingItem[], when: BookingsWhen, now = ne
 		else map.set(title, [item])
 	}
 	const keys = [...map.keys()]
-	const titles =
-		when === 'upcoming'
-			? UPCOMING_ORDER.filter((t) => map.has(t))
-			: [...keys.filter((t) => t !== 'EARLIER'), ...keys.filter((t) => t === 'EARLIER')]
+	const last = when === 'upcoming' ? 'IN PROGRESS' : 'EARLIER'
+	// Days come in the order the server sorted the bookings, TODAY and TOMORROW first when there are any, the catch-all section last.
+	const first = when === 'upcoming' ? ['TODAY', 'TOMORROW'].filter((t) => map.has(t)) : []
+	const titles = [
+		...first,
+		...keys.filter((t) => t !== last && !first.includes(t)),
+		...keys.filter((t) => t === last),
+	]
 	return titles.map((title) => ({ title, data: map.get(title) ?? [] }))
 }

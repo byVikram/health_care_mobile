@@ -31,7 +31,7 @@ export const STARTERS: CareAiStarter[] = [
 	{
 		id: 'meds',
 		title: 'Ask about medicines',
-		sub: 'Metformin 500 mg',
+		sub: 'Uses, side effects, interactions',
 		icon: 'M10.5 20.5a5 5 0 0 1-7-7l6-6a5 5 0 0 1 7 7zM8.5 8.5l7 7',
 		tone: 'lilac',
 	},
@@ -157,65 +157,5 @@ export const PRESCRIBING_DOCTOR = MOCK_DOCTORS[0]
 export const AREAS = ['Near me · Indiranagar', 'Jayanagar', 'Koramangala', 'HSR Layout']
 
 export const SAMPLE_REPORT = { name: 'HbA1c report.pdf', sub: 'Karola Labs · 28 Sep' }
-
-export const RECENT_CHATS: CareAiRecentChat[] = [
-	{
-		group: 'This week',
-		title: 'How much water should I drink daily?',
-		preview: 'About 2.5–3 litres a day for you, more on hot days.',
-		when: '22 Sep',
-		seed: 'h-water',
-		icon: 'M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z',
-		tone: 'sky',
-	},
-	{
-		group: 'This week',
-		title: 'Lipid profile report explained',
-		preview: 'LDL is a little high. Here’s what it means and next steps.',
-		when: '20 Sep',
-		seed: 'report',
-		icon: 'M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6',
-		tone: 'lilac',
-		tag: { label: 'Report', tone: 'lilac' },
-	},
-	{
-		group: 'This week',
-		title: 'Can I fast during Navratri?',
-		preview: 'With diabetes, check with your doctor before fasting.',
-		when: '18 Sep',
-		seed: 'other',
-		icon: 'M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z',
-		tone: 'mint',
-	},
-	{
-		group: 'Earlier',
-		title: 'Knee pain when climbing stairs',
-		preview: 'Booked Dr. Meera Iyer, Orthopaedic, for 12 Sep.',
-		when: '10 Sep',
-		seed: 'symptom',
-		icon: 'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
-		tone: 'peach',
-		tag: { label: 'For Raghav', tone: 'sand' },
-	},
-	{
-		group: 'Earlier',
-		title: 'Headache after starting Metformin',
-		preview: 'Common early on. Take it with food and drink water.',
-		when: '9 Sep',
-		seed: 'symptom',
-		icon: 'M10.5 20.5a4.95 4.95 0 0 1-7-7l6-6a4.95 4.95 0 0 1 7 7zM8.5 8.5l7 7',
-		tone: 'peach',
-	},
-	{
-		group: 'Earlier',
-		title: 'Reminder for Telmisartan 40',
-		preview: 'Daily reminder set for 8:00 AM.',
-		when: '2 Sep',
-		seed: 'other',
-		icon: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
-		tone: 'mint',
-		tag: { label: 'For Raghav', tone: 'sand' },
-	},
-]
 
 export const RECENT_GROUPS: CareAiRecentChat['group'][] = ['This week', 'Earlier']

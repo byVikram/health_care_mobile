@@ -1,9 +1,12 @@
 // src/features/bookings/BookingsPage.tsx
 //
-// Patient "My bookings" tab (design "3 · Bookings"): ink hero with "My bookings" + "{n} upcoming · {n} today"
-// and an Upcoming / Past toggle, a row of category tiles (All / Doctor / Ancillary / Lab / Pharmacy, counts from
-// the API), then the combined list from GET /api/patients/me/bookings grouped by day (upcoming) or month (past),
-// each rendered with the shared AppBookingCard. Pull to refresh, paged load-more, refetch on focus.
+// Patient "My bookings" tab (design "3 · Bookings"): the shared solid app bar (AppScreenHeader) with "My bookings" and
+// "{n} upcoming · {n} today", a row of category tiles (All / Doctor / Ancillary / Lab / Pharmacy, with the totals from the API),
+// then ONE list from GET /api/patients/me/bookings: what is coming up first, grouped by day (Today / Tomorrow / ...), then the past
+// ones grouped by month (the month titles are the only separator), each rendered with the shared AppBookingCard. There is no
+// Upcoming / Past toggle: the upcoming pages load first, the past ones follow when the upcoming are done (two cursors, the API's
+// `when=upcoming|past`).
+// Pull to refresh, paged load-more, refetch on focus.
 // Taps and card actions go through bookingNavigation.ts (-> each vertical's existing detail screens).
 // Other screens deep-link here with `{ filter }` (side drawer): doctor -> Doctor, ancillary -> Ancillary,
 // lab -> Lab, medicine -> Pharmacy, radiology -> All (radiology isn't part of this list).
@@ -13,7 +16,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	ActivityIndicator,
-	Pressable,
 	RefreshControl,
 	SectionList,
 	StatusBar,
@@ -31,18 +33,17 @@ import {
 } from '@react-navigation/native'
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
 
 import {
 	AppBookingCard,
 	AppButton,
-	AppHeaderBackdrop,
 	AppCategoryTile,
 	AppIcon,
 	AppIconTile,
 	AppInfoBanner,
 	AppSkeleton,
+	AppScreenHeader,
 	type AppBookingCardAction,
 } from '../../components/common'
 import { APP_COLORS, type ToneKey } from '../../config/theme'
@@ -55,7 +56,6 @@ import {
 	type BookingItem,
 	type BookingsCategoryFilter,
 	type BookingsPage as BookingsPageData,
-	type BookingsWhen,
 } from '../../services/bookingsService'
 import { buildS3Url } from '../../utils/s3Utils'
 import CancelAppointmentSheet from '../appointment/components/patient-details/CancelAppointmentSheet'
@@ -117,12 +117,9 @@ const CATEGORIES: { id: BookingsCategoryFilter; label: string; tone: ToneKey; ic
 	},
 ]
 
-const WHEN_TABS: { id: BookingsWhen; label: string }[] = [
-	{ id: 'upcoming', label: 'Upcoming' },
-	{ id: 'past', label: 'Past' },
-]
-
-type ListState = { key: string; items: BookingItem[]; page: number; pages: number }
+/** One of the two cursors (upcoming, past): the items loaded so far and the page reached. */
+type Part = { items: BookingItem[]; page: number; pages: number }
+type ListState = { key: string; up: Part; past: Part }
 
 const dedupe = (items: BookingItem[]) => {
 	const seen = new Set<string>()
@@ -134,23 +131,32 @@ const dedupe = (items: BookingItem[]) => {
 	})
 }
 
+const toPart = (res: BookingsPageData): Part => ({
+	items: dedupe(res.items ?? []),
+	page: res.page || 1,
+	pages: res.pages || 1,
+})
+const isDone = (part: Part) => part.page >= part.pages
+
 export default function BookingsPage() {
 	const navigation = useNavigation<PortalNavigation>()
 	const route = useRoute<PortalRoute>()
-	const insets = useSafeAreaInsets()
 	const clearance = useTabBarClearance()
 	const isFocused = useIsFocused()
 
-	const [when, setWhen] = useState<BookingsWhen>('upcoming')
 	const [category, setCategory] = useState<BookingsCategoryFilter>(() =>
 		route.params?.filter ? FILTER_TO_CATEGORY[route.params.filter] : 'all'
 	)
-	const key = `${when}:${category}`
+	const key = category
 
 	const [list, setList] = useState<ListState | null>(null)
-	const [countsFor, setCountsFor] = useState<{ when: BookingsWhen; counts: BookingsPageData['counts'] } | null>(null)
+	// The tiles' counts of the upcoming and of the past bookings: a tile shows their total.
+	const [counts, setCounts] = useState<{
+		up: BookingsPageData['counts']
+		past: BookingsPageData['counts']
+	} | null>(null)
 	const [summary, setSummary] = useState<BookingsPageData['summary'] | null>(null)
-	/** when:category key whose first page failed to load (and nothing is cached for it). */
+	/** The category whose first page failed to load (and nothing is cached for it). */
 	const [failedKey, setFailedKey] = useState<string | null>(null)
 	const [refreshing, setRefreshing] = useState(false)
 	const [loadingMore, setLoadingMore] = useState(false)
@@ -172,12 +178,7 @@ export default function BookingsPage() {
 		navigation.setParams({ filter: undefined })
 	}, [filterParam, navigation])
 
-	const applyPage = (res: BookingsPageData, forWhen: BookingsWhen) => {
-		if (res.counts) setCountsFor({ when: forWhen, counts: res.counts })
-		if (res.summary) setSummary(res.summary)
-	}
-
-	/** First page for the current when + category. 'refresh' = pull to refresh; otherwise silent when cached. */
+	/** First page of the upcoming and of the past bookings of the category, together. 'refresh' = pull to refresh; otherwise silent when cached. */
 	const load = useCallback(
 		async (mode: 'focus' | 'refresh' | 'retry') => {
 			const req = ++reqRef.current
@@ -185,10 +186,14 @@ export default function BookingsPage() {
 			if (mode === 'refresh') setRefreshing(true)
 			setFailedKey(null)
 			try {
-				const res = await getMyBookings({ when, category, page: 1, limit: PAGE_SIZE })
+				const [upcoming, past] = await Promise.all([
+					getMyBookings({ when: 'upcoming', category, page: 1, limit: PAGE_SIZE }),
+					getMyBookings({ when: 'past', category, page: 1, limit: PAGE_SIZE }),
+				])
 				if (req !== reqRef.current) return
-				setList({ key, items: dedupe(res.items ?? []), page: res.page || 1, pages: res.pages || 1 })
-				applyPage(res, when)
+				setList({ key, up: toPart(upcoming), past: toPart(past) })
+				if (upcoming.counts && past.counts) setCounts({ up: upcoming.counts, past: past.counts })
+				if (upcoming.summary) setSummary(upcoming.summary)
 			} catch {
 				if (req !== reqRef.current) return
 				if (cached && mode === 'refresh') {
@@ -200,7 +205,7 @@ export default function BookingsPage() {
 				if (req === reqRef.current) setRefreshing(false)
 			}
 		},
-		[key, when, category]
+		[key, category]
 	)
 
 	// Runs on focus and whenever when / category change while focused.
@@ -210,26 +215,35 @@ export default function BookingsPage() {
 		}, [load])
 	)
 
+	// The next page: of the upcoming bookings while there are more, then of the past ones.
 	const loadMore = async () => {
 		const current = listRef.current
 		if (!current || current.key !== key || refreshing || loadingMore) return
-		if (current.page >= current.pages) return
+		const which = isDone(current.up) ? 'past' : 'up'
+		const part = current[which]
+		if (isDone(part)) return
 		const req = reqRef.current
 		setLoadingMore(true)
 		try {
-			const res = await getMyBookings({ when, category, page: current.page + 1, limit: PAGE_SIZE })
+			const res = await getMyBookings({
+				when: which === 'up' ? 'upcoming' : 'past',
+				category,
+				page: part.page + 1,
+				limit: PAGE_SIZE,
+			})
 			if (req !== reqRef.current) return
 			setList((prev) =>
 				prev && prev.key === key
 					? {
-							key,
-							items: dedupe([...prev.items, ...(res.items ?? [])]),
-							page: res.page || prev.page + 1,
-							pages: res.pages || prev.pages,
+							...prev,
+							[which]: {
+								items: dedupe([...prev[which].items, ...(res.items ?? [])]),
+								page: res.page || prev[which].page + 1,
+								pages: res.pages || prev[which].pages,
+							},
 						}
 					: prev
 			)
-			applyPage(res, when)
 		} catch {
 			if (req === reqRef.current) Toast.show({ type: 'error', text1: "Couldn't load more bookings" })
 		} finally {
@@ -237,9 +251,21 @@ export default function BookingsPage() {
 		}
 	}
 
-	const items = list?.key === key ? list.items : []
-	const sections = useMemo(() => groupBookings(items, when), [items, when])
-	const counts = countsFor?.when === when ? countsFor.counts : null
+	const loaded = list?.key === key ? list : null
+	// Upcoming first; the past ones only once every upcoming page is in, so a past booking never lands above an upcoming one.
+	const sections = useMemo<BookingSection[]>(() => {
+		if (!loaded) return []
+		const upcoming = groupBookings(loaded.up.items, 'upcoming')
+		if (!isDone(loaded.up)) return upcoming
+		const upKeys = new Set(loaded.up.items.map(bookingKey))
+		const past = groupBookings(
+			loaded.past.items.filter((i) => !upKeys.has(bookingKey(i))),
+			'past'
+		)
+		return [...upcoming, ...past]
+	}, [loaded])
+	const pastKeys = useMemo(() => new Set(loaded?.past.items.map(bookingKey) ?? []), [loaded])
+	const noUpcoming = !!loaded && loaded.up.items.length === 0 && loaded.past.items.length > 0
 	const showError = failedKey === key && list?.key !== key
 	const showSkeleton = list?.key !== key && !showError
 
@@ -272,7 +298,7 @@ export default function BookingsPage() {
 
 	const renderItem = ({ item }: { item: BookingItem }) => (
 		<AppBookingCard
-			style={styles.card}
+			style={[styles.card, pastKeys.has(bookingKey(item)) && styles.pastCard]}
 			kind={CATEGORY_KIND[item.category] ?? 'doctor'}
 			kindLabel={item.kind_label || undefined}
 			imageUri={buildS3Url(item.avatar_url)}
@@ -297,21 +323,24 @@ export default function BookingsPage() {
 	)
 
 	const categoryName = category === 'all' ? '' : ` ${CATEGORIES.find((c) => c.id === category)?.label.toLowerCase()}`
-	const emptyTitle = `No ${when === 'upcoming' ? 'upcoming' : 'past'}${categoryName} bookings`
+	const emptyTitle = `No${categoryName} bookings yet`
 
 	const listHeader = (
-		<View style={styles.tiles} accessibilityLabel="Booking type">
-			{CATEGORIES.map((c) => (
-				<AppCategoryTile
-					key={c.id}
-					label={c.label}
-					iconPath={c.icon}
-					tone={c.tone}
-					active={category === c.id}
-					count={c.id === 'all' ? null : counts?.[c.id]}
-					onPress={() => setCategory(c.id)}
-				/>
-			))}
+		<View style={styles.headerWrap}>
+			<View style={styles.tiles} accessibilityLabel="Booking type">
+				{CATEGORIES.map((c) => (
+					<AppCategoryTile
+						key={c.id}
+						label={c.label}
+						iconPath={c.icon}
+						tone={c.tone}
+						active={category === c.id}
+						count={c.id === 'all' || !counts ? null : (counts.up[c.id] ?? 0) + (counts.past[c.id] ?? 0)}
+						onPress={() => setCategory(c.id)}
+					/>
+				))}
+			</View>
+			{noUpcoming && <Text style={styles.noUpcoming}>{`No upcoming${categoryName} bookings`}</Text>}
 		</View>
 	)
 
@@ -360,40 +389,13 @@ export default function BookingsPage() {
 		<View style={styles.container}>
 			{isFocused && <StatusBar barStyle="light-content" />}
 
-			<View style={[styles.hero, { paddingTop: insets.top + 8 }]}>
-				<AppHeaderBackdrop />
-				<View style={styles.heroRow}>
-					<Text style={styles.heroTitle} accessibilityRole="header">
-						My bookings
-					</Text>
-					{summary ? (
-						<Text
-							style={styles.heroSummary}
-						>{`${summary.upcoming} upcoming · ${summary.today} today`}</Text>
-					) : (
-						<View style={styles.heroSummarySkeleton}>
-							<AppSkeleton width={140} height={14} borderRadius={7} color={APP_COLORS.primary} />
-						</View>
-					)}
-				</View>
-				<View style={styles.whenTrack} accessibilityRole="tablist" accessibilityLabel="When">
-					<View style={styles.whenTrackFill} />
-					{WHEN_TABS.map((w) => {
-						const on = when === w.id
-						return (
-							<Pressable
-								key={w.id}
-								accessibilityRole="tab"
-								accessibilityState={{ selected: on }}
-								onPress={() => setWhen(w.id)}
-								style={[styles.whenTab, on && styles.whenTabOn]}
-							>
-								<Text style={[styles.whenText, on && styles.whenTextOn]}>{w.label}</Text>
-							</Pressable>
-						)
-					})}
-				</View>
-			</View>
+			<AppScreenHeader
+				variant="bar"
+				solid
+				showBack={false}
+				title="My bookings"
+				subtitle={summary ? `${summary.upcoming} upcoming · ${summary.today} today` : undefined}
+			/>
 
 			<SectionList<BookingItem, BookingSection>
 				sections={showSkeleton || showError ? [] : sections}
@@ -471,77 +473,25 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: APP_COLORS.pageBg,
 	},
-	hero: {
-		zIndex: 2,
-		overflow: 'hidden',
-		backgroundColor: APP_COLORS.ink,
-		paddingHorizontal: 16,
-		paddingBottom: 16,
-		gap: 12,
-		borderBottomLeftRadius: 24,
-		borderBottomRightRadius: 24,
-	},
-	heroRow: {
-		minHeight: 52,
-		justifyContent: 'center',
-	},
-	heroTitle: {
-		fontSize: 22,
-		lineHeight: 28,
-		fontWeight: '800',
-		color: APP_COLORS.surface,
-	},
-	heroSummary: {
-		fontSize: 13,
-		lineHeight: 18,
-		fontWeight: '600',
-		color: APP_COLORS.mintAccent,
-	},
-	heroSummarySkeleton: {
-		height: 18,
-		justifyContent: 'center',
-	},
-	whenTrack: {
-		flexDirection: 'row',
-		gap: 4,
-		padding: 4,
-		borderRadius: 12,
-		overflow: 'hidden',
-	},
-	// Translucent white track (design: #FFFFFF1F) built from the surface token.
-	whenTrackFill: {
-		...StyleSheet.absoluteFill,
-		backgroundColor: APP_COLORS.surface,
-		opacity: 0.12,
-	},
-	whenTab: {
-		flex: 1,
-		height: 38,
-		borderRadius: 9,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	whenTabOn: {
-		backgroundColor: APP_COLORS.surface,
-	},
-	whenText: {
-		fontSize: 14,
-		lineHeight: 20,
-		fontWeight: '700',
-		color: APP_COLORS.mint,
-	},
-	whenTextOn: {
-		color: APP_COLORS.ink,
-	},
 	listContent: {
 		paddingTop: 16,
 		flexGrow: 1,
+	},
+	headerWrap: {
+		gap: 12,
 	},
 	tiles: {
 		flexDirection: 'row',
 		gap: 6,
 		paddingHorizontal: 16,
 	},
+	noUpcoming: {
+		paddingHorizontal: 16,
+		fontSize: 14,
+		lineHeight: 20,
+		color: APP_COLORS.inkMuted,
+	},
+
 	sectionTitle: {
 		marginTop: 18,
 		paddingHorizontal: 16,
@@ -554,6 +504,10 @@ const styles = StyleSheet.create({
 	card: {
 		marginHorizontal: 16,
 		marginTop: 10,
+	},
+	// A past booking reads quieter than one still to come.
+	pastCard: {
+		opacity: 0.88,
 	},
 	footerSpinner: {
 		marginVertical: 16,

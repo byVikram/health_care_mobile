@@ -135,6 +135,11 @@ export const SOFT_CARD_SHADOW = {
 	boxShadow: '0px 8px 12px rgba(18, 55, 62, 0.14)',
 } as const
 
+/** A small lift for a chat bubble. */
+export const BUBBLE_SHADOW = {
+	boxShadow: '0px 2px 4px rgba(18, 55, 62, 0.18)',
+} as const
+
 export const formatInr = (amount?: number | string | null) => {
 	const n = Number(amount)
 	if (!Number.isFinite(n) || n <= 0) return '--'

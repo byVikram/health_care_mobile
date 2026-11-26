@@ -6,7 +6,7 @@
 //       kind label 11/14 800 caps in the tone ink + AppTag status (STATUS_TONES key), title 16/22 800, sub 13/18 muted.
 //   when / where box (APP_COLORS.pageBg, margin 0 14, padding 10x12, radius 10, gap 4):
 //       AppIcon calendar (primary) + when 14/20 700, where icon (inkMuted) + where 13/18 muted.
-//   optional note banner (warning tone by default, 12/16 700, clock icon; margin 8 14 0, padding 8x10, radius 10),
+//   optional note banner (warning tone by default, 12/16 700, an icon only when the note names one; margin 8 14 0, padding 8x10, radius 10),
 //       e.g. "Start code 3957 · share it when the nurse arrives".
 //   footer (padding 12 14 14): ref line 12/16 muted (flex), secondary AppActionChip (outline) + primary (filled).
 // `onPress` makes the head + details region a button; the footer actions stay separate touch targets.
@@ -206,7 +206,7 @@ export function AppBookingCard({
 
 			{!!noteObj && (
 				<View style={[styles.note, { backgroundColor: noteTone.bg }]}>
-					<MaterialCommunityIcons name={noteObj.icon ?? 'clock-outline'} size={16} color={noteTone.ink} />
+					{!!noteObj.icon && <MaterialCommunityIcons name={noteObj.icon} size={16} color={noteTone.ink} />}
 					<Text style={[styles.noteText, { color: noteTone.ink }]}>{noteObj.text}</Text>
 				</View>
 			)}
