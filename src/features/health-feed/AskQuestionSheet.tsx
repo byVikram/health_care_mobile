@@ -32,8 +32,9 @@ import { FEED_ICONS, toneForTopic } from './feedTheme'
 const GENDERS = ['Female', 'Male', 'Other']
 const OTHER_KEY = 'other'
 const MAX_TAGS = 3
-const MIN_TITLE = 10
-const MIN_BODY = 20
+// No minimum length: a question and its description only have to be filled in. The inputs stop at these maximums.
+const MAX_TITLE = 120
+const MAX_BODY = 1000
 const FIELD_BORDER = '#9FB4B6'
 const ERROR = '#B42318'
 
@@ -152,8 +153,8 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 	const current = people.find((p) => p.key === who) ?? people[0]
 	const other = who === OTHER_KEY
 	const okTags = tags.length > 0
-	const okTitle = title.trim().length >= MIN_TITLE
-	const okBody = body.trim().length >= MIN_BODY
+	const okTitle = title.trim().length > 0
+	const okBody = body.trim().length > 0
 	const okWho = !other || (age.trim() !== '' && !!gender)
 	const ready = okTags && okTitle && okBody && okWho
 	const err = (ok: boolean) => tried && !ok
@@ -351,7 +352,7 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 									<TextInput
 										value={title}
 										onChangeText={setTitle}
-										maxLength={120}
+										maxLength={MAX_TITLE}
 										placeholder="e.g. Is it safe to fast with type 2 diabetes?"
 										placeholderTextColor="#7A8B8E"
 										style={[
@@ -361,11 +362,11 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 									/>
 									<View style={styles.helpRow}>
 										<Text style={[styles.help, err(okTitle) && styles.helpError]}>
-											{err(okTitle)
-												? 'Please write at least 10 characters'
-												: 'Keep it short and clear'}
+											{err(okTitle) ? 'Please write your question' : 'Keep it short and clear'}
 										</Text>
-										<Text style={styles.count}>{title.length}/120</Text>
+										<Text style={styles.count}>
+											{title.length}/{MAX_TITLE}
+										</Text>
 									</View>
 								</View>
 
@@ -374,7 +375,7 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 									<TextInput
 										value={body}
 										onChangeText={setBody}
-										maxLength={1000}
+										maxLength={MAX_BODY}
 										multiline
 										textAlignVertical="top"
 										placeholder="Include your symptoms, how long you’ve had them, and any medicines you take."
@@ -384,10 +385,12 @@ export function AskQuestionSheet({ visible, onClose, onPosted, onViewQuestion }:
 									<View style={styles.helpRow}>
 										<Text style={[styles.help, err(okBody) && styles.helpError, { flex: 1 }]}>
 											{err(okBody)
-												? 'Please add a few more details (at least 20 characters)'
+												? 'Please describe your concern'
 												: 'More details help doctors give a better answer'}
 										</Text>
-										<Text style={styles.count}>{body.length}/1000</Text>
+										<Text style={styles.count}>
+											{body.length}/{MAX_BODY}
+										</Text>
 									</View>
 								</View>
 
