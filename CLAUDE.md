@@ -87,6 +87,7 @@ npx expo prebuild --platform android       # applies app.json + plugins/ to the 
 - [docs/consultation-vitals.md](docs/consultation-vitals.md): the doctor's vitals card and sheet.
 - [docs/medical-records.md](docs/medical-records.md): the patient's records list, upload and viewer.
 - [docs/app-updates.md](docs/app-updates.md): the launch-time update check.
+- [docs/care-ai.md](docs/care-ai.md): the Care AI chat: how a message goes to the backend chatbot, how a reply is drawn, recent chats, and what is not built yet.
 
 ## Other files
 

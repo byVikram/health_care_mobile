@@ -1,13 +1,18 @@
 // src/features/care-ai/careAiTypes.ts
 //
-// Types for the Care AI chat: the scripted reply a turn is built from, the messages in the conversation and the
-// "where does this button go" links. The replies are mock data for now (careAiReplies.ts) -- there is no chat API
-// behind this screen yet.
+// Types for the Care AI chat: the reply a turn is built from, the messages in the conversation and the
+// "where does this button go" links. Answers come from the backend chat (careAiService.ts, turned into a CareAiReply
+// by careAiMapper.ts); the welcome prompts, the offline fallback and the launch scenarios are scripted (careAiReplies.ts).
 
 import type { ToneKey } from '../../config/theme'
 
-/** Which scripted reply a turn shows. Also tells the chips under it what to do when one is tapped. */
+/**
+ * Which kind of reply a turn shows. 'answer' / 'error' are the backend's reply and the "could not reach it" line;
+ * the rest are scripted. It also tells the chips under a scripted turn what to do when one is tapped.
+ */
 export type CareAiReplyId =
+	| 'answer'
+	| 'error'
 	| 'greet'
 	| 'health-ask'
 	| 'health'
@@ -38,6 +43,7 @@ export type CareAiDoctorSort = 'rel' | 'near' | 'fee' | 'exp'
 /** A screen a button inside a reply opens. */
 export type CareAiLink =
 	| { to: 'doctors'; query?: string; mode?: 'all' | 'video' | 'clinic'; sort?: CareAiDoctorSort }
+	| { to: 'doctor'; id: string }
 	| { to: 'appointments' }
 
 export type CareAiAction = {
@@ -76,6 +82,18 @@ export type CareAiConsult = {
 	link: CareAiLink
 }
 
+/** A real doctor the chat suggests: a row that opens the doctor's page. */
+export type CareAiDoctorResult = {
+	id: string
+	name: string
+	/** "Dermatology · 8 yrs" */
+	meta: string
+	/** "₹600 · Whitefield Skin Clinic" */
+	detail: string
+	/** "Next slot: today 5:30 PM" (the backend's own wording), when it has one. */
+	slot?: string
+}
+
 export type CareAiBook = {
 	name: string
 	meta: string
@@ -89,6 +107,9 @@ export type CareAiBook = {
 
 export type CareAiSummary = { title: string; rows: [label: string, value: string][] }
 
+/** A second list under the first ("Possible causes", then "What you can do"). */
+export type CareAiList = { title: string; bullets: string[] }
+
 /** Everything one Care AI turn can show. Every field is optional except the follow-up suggestions. */
 export type CareAiReply = {
 	text?: string
@@ -97,6 +118,8 @@ export type CareAiReply = {
 	follow: CareAiFollowUp[]
 	urgent?: { title: string; body: string }
 	consult?: CareAiConsult
+	/** Real doctors from the chat's doctor search. */
+	doctors?: CareAiDoctorResult[]
 	/** A sentence after the consult card. */
 	after?: string
 	summary?: CareAiSummary
@@ -105,6 +128,8 @@ export type CareAiReply = {
 	med?: { name: string; sub: string }
 	bulletsTitle?: string
 	bullets?: string[]
+	/** More lists shown after `bullets`. */
+	moreLists?: CareAiList[]
 	/** Yellow caution callout. */
 	note?: string
 	actions?: CareAiAction[]
@@ -127,6 +152,8 @@ export type CareAiAssistantMessage = {
 	role: 'ai'
 	kind: CareAiReplyId
 	reply: CareAiReply
+	/** The backend's id of this answer (what the thumbs up / down is filed against). Scripted turns have none. */
+	messageId?: string
 	/** The chip (or starter) already chosen on this turn; the others lock. */
 	picked?: string
 	/** Booking turn only: the slot that starts selected (opened from a screen that already picked one). */
@@ -144,17 +171,14 @@ export type CareAiStarter = {
 	tone: ToneKey
 }
 
-/** One row in "Recent chats". */
+/** One row in "Recent chats": a saved conversation. */
 export type CareAiRecentChat = {
+	/** The chat session's id. */
+	id: string
 	group: 'This week' | 'Earlier'
 	title: string
 	preview: string
 	when: string
-	/** The reply the chat re-asks when opened. */
-	seed: CareAiReplyId
-	icon: string
-	tone: ToneKey
-	tag?: { label: string; tone: ToneKey }
 }
 
 /**

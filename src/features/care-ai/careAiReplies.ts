@@ -43,6 +43,8 @@ export type CareAiReplyContext = { firstName: string }
 export function buildReply(id: CareAiReplyId, arg: CareAiReplyArg | undefined, ctx: CareAiReplyContext): CareAiReply {
 	switch (id) {
 		case 'greet':
+		case 'answer':
+		case 'error':
 			return { follow: [] }
 
 		case 'health-ask':
@@ -133,13 +135,8 @@ export function buildReply(id: CareAiReplyId, arg: CareAiReplyArg | undefined, c
 
 		case 'meds':
 			return {
-				text: 'Yes. Paracetamol is generally safe to take with Metformin at the usual dose: 500 mg to 1 g at a time, up to 4 g in a day.',
-				med: { name: 'Metformin 500 mg', sub: 'After lunch and dinner · next dose 8:30 PM' },
-				note: 'Check with your doctor first if you have liver or kidney problems, or take it for more than 3 days.',
-				actions: [{ label: 'Remind me at 8:30 PM', doneLabel: 'Reminder set for 8:30 PM' }],
-				source: 'Based on your prescription · Dr. Ananya Rao',
-				why: ['Prescription · Dr. Ananya Rao · 12 Sep', 'Medicines list · Metformin 500 mg'],
-				follow: [ask('Can I skip a dose?'), ask('What are the side effects of Metformin?')],
+				text: 'Sure. Which medicine would you like to know about? Type its name and what you’d like to know, for example “Can I take paracetamol with other tablets?”',
+				follow: [],
 			}
 
 		case 'doctor':

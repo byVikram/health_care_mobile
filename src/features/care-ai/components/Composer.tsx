@@ -1,6 +1,6 @@
 // src/features/care-ai/components/Composer.tsx
 //
-// The message box at the bottom of the chat: add a report (+), type, speak (mic) and send. While listening it
+// The message box at the bottom of the chat: add a report (+, when the screen can), type, speak (mic) and send. While listening it
 // swaps for the "Listening… speak now" bar with the animated waveform. The disclaimer sits underneath.
 
 import React, { useEffect, useRef } from 'react'
@@ -50,8 +50,11 @@ type Props = {
 	draft: string
 	onChangeDraft: (text: string) => void
 	onSend: () => void
-	onAttach: () => void
+	/** The + button (add a report or photo); without it there is none. */
+	onAttach?: () => void
 	listening: boolean
+	/** What is being heard while the mic is open (shown in place of "Listening… speak now"). */
+	heard?: string
 	onStartListening: () => void
 	onStopListening: () => void
 	/** Blocks sending while a reply is on its way. */
@@ -64,6 +67,7 @@ export function Composer({
 	onSend,
 	onAttach,
 	listening,
+	heard,
 	onStartListening,
 	onStopListening,
 	busy,
@@ -84,8 +88,8 @@ export function Composer({
 							<WaveBar key={i} index={i} />
 						))}
 					</View>
-					<Text style={styles.listeningText} accessibilityLiveRegion="polite">
-						Listening… speak now
+					<Text style={styles.listeningText} numberOfLines={2} accessibilityLiveRegion="polite">
+						{heard || 'Listening… speak now'}
 					</Text>
 					<AppButton size="md" radius={22} onPress={onStopListening}>
 						Done
@@ -93,16 +97,23 @@ export function Composer({
 				</View>
 			) : (
 				<View style={styles.box}>
-					<AppIconButton
-						circle
-						size={44}
-						variant="soft"
-						accessibilityLabel="Add a report or photo"
-						onPress={onAttach}
-						backgroundColor={CARE_AI.softSurface}
-					>
-						<AppPathIcon d={CARE_AI_ICONS.plus} size={20} strokeWidth={2.2} color={APP_COLORS.primary} />
-					</AppIconButton>
+					{onAttach ? (
+						<AppIconButton
+							circle
+							size={44}
+							variant="soft"
+							accessibilityLabel="Add a report or photo"
+							onPress={onAttach}
+							backgroundColor={CARE_AI.softSurface}
+						>
+							<AppPathIcon
+								d={CARE_AI_ICONS.plus}
+								size={20}
+								strokeWidth={2.2}
+								color={APP_COLORS.primary}
+							/>
+						</AppIconButton>
+					) : null}
 					<TextInput
 						value={draft}
 						onChangeText={onChangeDraft}

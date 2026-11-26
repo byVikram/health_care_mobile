@@ -16,9 +16,11 @@ import { CareAiAvatar } from './CareAiAvatar'
 
 type WelcomeProps = {
 	firstName: string
-	recordsOn: boolean
-	onToggleRecords: (on: boolean) => void
-	onExplainReport: () => void
+	/** Without these two the "Use my health records" switch is not shown. */
+	recordsOn?: boolean
+	onToggleRecords?: (on: boolean) => void
+	/** Without it the report banner is not shown (reading a patient's reports is not built yet). */
+	onExplainReport?: () => void
 	onPickStarter: (starter: CareAiStarter) => void
 }
 
@@ -37,25 +39,27 @@ export function WelcomePanel({ firstName, recordsOn, onToggleRecords, onExplainR
 				</View>
 			</View>
 
-			<TouchableOpacity
-				onPress={onExplainReport}
-				activeOpacity={0.9}
-				accessibilityRole="button"
-				accessibilityLabel="Your HbA1c report is ready. Explain it"
-				style={styles.reportBanner}
-			>
-				<View style={styles.reportTile}>
-					<AppPathIcon d={CARE_AI_ICONS.flask} size={22} strokeWidth={2} color={APP_COLORS.ink} />
-				</View>
-				<View style={styles.reportText}>
-					<Text style={styles.reportEyebrow}>NEW FOR YOU</Text>
-					<Text style={styles.reportTitle}>Your HbA1c report is ready</Text>
-					<Text style={styles.reportSub}>Karola Labs · 28 Sep</Text>
-				</View>
-				<View style={styles.reportCta}>
-					<Text style={styles.reportCtaText}>Explain it</Text>
-				</View>
-			</TouchableOpacity>
+			{onExplainReport ? (
+				<TouchableOpacity
+					onPress={onExplainReport}
+					activeOpacity={0.9}
+					accessibilityRole="button"
+					accessibilityLabel="Your HbA1c report is ready. Explain it"
+					style={styles.reportBanner}
+				>
+					<View style={styles.reportTile}>
+						<AppPathIcon d={CARE_AI_ICONS.flask} size={22} strokeWidth={2} color={APP_COLORS.ink} />
+					</View>
+					<View style={styles.reportText}>
+						<Text style={styles.reportEyebrow}>NEW FOR YOU</Text>
+						<Text style={styles.reportTitle}>Your HbA1c report is ready</Text>
+						<Text style={styles.reportSub}>Karola Labs · 28 Sep</Text>
+					</View>
+					<View style={styles.reportCta}>
+						<Text style={styles.reportCtaText}>Explain it</Text>
+					</View>
+				</TouchableOpacity>
+			) : null}
 
 			<Text style={styles.sectionLabel}>OR ASK ABOUT</Text>
 			<View style={styles.starterCard}>
@@ -87,24 +91,26 @@ export function WelcomePanel({ firstName, recordsOn, onToggleRecords, onExplainR
 				))}
 			</View>
 
-			<View style={styles.recordsRow}>
-				<AppPathIcon d={CARE_AI_ICONS.shieldCheck} size={18} strokeWidth={2.1} color={APP_COLORS.success} />
-				<View style={styles.recordsText}>
-					<Text style={styles.recordsTitle}>Use my health records</Text>
-					<Text style={styles.recordsSub}>
-						{recordsOn
-							? 'Personal answers from your reports, medicines and visits'
-							: 'Off · answers will be general'}
-					</Text>
+			{onToggleRecords && recordsOn !== undefined ? (
+				<View style={styles.recordsRow}>
+					<AppPathIcon d={CARE_AI_ICONS.shieldCheck} size={18} strokeWidth={2.1} color={APP_COLORS.success} />
+					<View style={styles.recordsText}>
+						<Text style={styles.recordsTitle}>Use my health records</Text>
+						<Text style={styles.recordsSub}>
+							{recordsOn
+								? 'Personal answers from your reports, medicines and visits'
+								: 'Off · answers will be general'}
+						</Text>
+					</View>
+					<AppToggle
+						value={recordsOn}
+						onValueChange={onToggleRecords}
+						showStatusText={false}
+						activeColor={APP_COLORS.success}
+						accessibilityLabel="Use my health records for personal answers"
+					/>
 				</View>
-				<AppToggle
-					value={recordsOn}
-					onValueChange={onToggleRecords}
-					showStatusText={false}
-					activeColor={APP_COLORS.success}
-					accessibilityLabel="Use my health records for personal answers"
-				/>
-			</View>
+			) : null}
 		</View>
 	)
 }
