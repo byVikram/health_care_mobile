@@ -23,10 +23,15 @@ import {
 	TouchableOpacity,
 	View,
 } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { AppChip, AppPathIcon, AppTag } from '../../../components/common'
+import { ROUTES } from '../../../navigation/routes'
+import type { AppStackParamList } from '../../../navigation/types'
 import { APP_COLORS, TONES, toneForString } from '../../../config/theme'
 import { useTabBarClearance } from '../../../navigation/tabBar'
 import { DoctorScreenHeader } from './DoctorScreenHeader'
+import { MyAnswersLink } from './MyAnswersLink'
 import { DoctorStatusBanner } from './DoctorStatusBanner'
 import { useDoctorStatus } from './useDoctorStatus'
 import { listHealthQuestions, submitDoctorAnswer, type PatientQuestion } from '../../../services/qaService'
@@ -45,7 +50,7 @@ const TOPIC_PREFIX = 'topic:'
 // "No answers yet" reads in the peach ink of the design.
 const OPEN_INK = TONES.peach.ink
 
-const MIN_ANSWER_LENGTH = 60
+// An answer needs some text, nothing more: the quick snippets below are only a shortcut, never required.
 
 const QUICK_SNIPPETS = [
 	{
@@ -66,6 +71,7 @@ export function DoctorEngageScreen() {
 	// available, and the server still decides.
 	const canAnswer = !doctorStatus || doctorStatus.is_verified
 
+	const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>()
 	const [questions, setQuestions] = useState<PatientQuestion[]>([])
 	const [answeredTotal, setAnsweredTotal] = useState<number | null>(null)
 	const [openTotal, setOpenTotal] = useState<number | null>(null)
@@ -142,7 +148,7 @@ export function DoctorEngageScreen() {
 
 	const handlePost = async (q: PatientQuestion) => {
 		const draft = (drafts[q.id] ?? '').trim()
-		if (draft.length < MIN_ANSWER_LENGTH) return
+		if (!draft) return
 		setPosting(q.id)
 		try {
 			const res = await submitDoctorAnswer(q.id, draft)
@@ -196,6 +202,7 @@ export function DoctorEngageScreen() {
 							<Text style={styles.countPillText}>{openCountLabel}</Text>
 						</View>
 					</View>
+					<MyAnswersLink onPress={() => navigation.navigate(ROUTES.STACK.DOCTOR_MY_ANSWERS)} />
 
 					<ScrollView
 						horizontal
@@ -233,7 +240,7 @@ export function DoctorEngageScreen() {
 							const done = !!justPosted[q.id] && !composing
 							const draft = drafts[q.id] ?? ''
 							const chars = draft.trim().length
-							const canPost = chars >= MIN_ANSWER_LENGTH
+							const canPost = chars > 0
 							const firstTag = splitTags(q.tag)[0] ?? 'General'
 							const tone = toneForString(firstTag)
 							const answered = q.answers.length > 0
@@ -335,6 +342,7 @@ export function DoctorEngageScreen() {
 												accessibilityLabel={`Answer to: ${q.question}`}
 											/>
 											<View style={styles.snipRow}>
+												<Text style={styles.snipHint}>Quick add (optional)</Text>
 												{QUICK_SNIPPETS.map((s) => (
 													<TouchableOpacity
 														key={s.label}
@@ -372,10 +380,7 @@ export function DoctorEngageScreen() {
 												<Text style={styles.offerLabel}>Offer a consultation with me</Text>
 											</TouchableOpacity>
 											<Text style={styles.countHint}>
-												Public answer · don&apos;t diagnose or give doses ·{' '}
-												{canPost
-													? `${chars} characters`
-													: `min ${MIN_ANSWER_LENGTH} characters · ${chars}`}
+												Public answer · don&apos;t diagnose or give doses · {chars} characters
 											</Text>
 											<View style={{ flexDirection: 'row', gap: 8 }}>
 												<TouchableOpacity
@@ -519,7 +524,8 @@ const styles = StyleSheet.create({
 		color: APP_COLORS.ink,
 		textAlignVertical: 'top',
 	},
-	snipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+	snipRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+	snipHint: { width: '100%', fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
 	snipChip: {
 		height: 32,
 		paddingHorizontal: 10,

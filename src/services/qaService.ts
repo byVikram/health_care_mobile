@@ -22,6 +22,8 @@ export interface DoctorAnswer {
 	doctor_specialty: string
 	doctor_hospital: string
 	doctor_avatar?: string
+	/** True when the signed-in caller is the doctor who wrote this answer ("My answers"). */
+	is_mine?: boolean
 	replies: DoctorAnswerReply[]
 }
 
@@ -66,6 +68,25 @@ export const listHealthQuestions = async (
 		params.answered = answered
 	}
 	const res = await ApiService.getWithParams<PaginatedQuestionsResponse>(API_ENDPOINTS.QA.LIST, params)
+	return res.data
+}
+
+/** The signed-in patient's own questions, newest first, the ones still waiting for review included ("My questions"). */
+export const listMyQuestions = async (page = 1, limit = 50): Promise<PaginatedQuestionsResponse> => {
+	// The list shows its own error state and the entry card stays plain on a failure: no global error dialog for either.
+	const res = await ApiService.get<PaginatedQuestionsResponse>(API_ENDPOINTS.QA.LIST, {
+		params: { scope: 'mine', page, limit },
+		skipGlobalError: true,
+	})
+	return res.data
+}
+
+/** The questions the signed-in doctor has answered, the newest answer of theirs first; their own answer has `is_mine` ("My answers"). */
+export const listMyAnswers = async (page = 1, limit = 50): Promise<PaginatedQuestionsResponse> => {
+	const res = await ApiService.get<PaginatedQuestionsResponse>(API_ENDPOINTS.QA.LIST, {
+		params: { scope: 'answered_by_me', page, limit },
+		skipGlobalError: true,
+	})
 	return res.data
 }
 

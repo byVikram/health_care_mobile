@@ -10,7 +10,7 @@ import { useNavigation, useRoute, type RouteProp } from '@react-navigation/nativ
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Toast from 'react-native-toast-message'
-import { AppAvatar, AppPathIcon } from '../../components/common'
+import { AppPathIcon } from '../../components/common'
 import { APP_COLORS } from '../../config/theme'
 import { ROUTES } from '../../navigation/routes'
 import type { AppStackParamList } from '../../navigation/types'
@@ -21,13 +21,12 @@ import {
 	type DoctorAnswer,
 	type PatientQuestion,
 } from '../../services/qaService'
-import { buildS3Url } from '../../utils/s3Utils'
+import { AnswerCard } from './AnswerCard'
 import { AskQuestionSheet } from './AskQuestionSheet'
 import { askerLine } from './HealthQuestionsPage'
-import { FEED_ICONS, initialsOf, relativeTime, splitTags, toneForTopic } from './feedTheme'
+import { FEED_ICONS, relativeTime, splitTags, toneForTopic } from './feedTheme'
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
-const GREEN = '#1E7A4E'
 const AMBER = '#8A5300'
 
 export default function QuestionThreadPage() {
@@ -195,6 +194,9 @@ export default function QuestionThreadPage() {
 							<AnswerCard
 								key={a.id}
 								a={a}
+								likes={a.likes}
+								avatar
+								style={styles.answerSlot}
 								top={i === 0 && answers.length > 1 && a.likes > 0}
 								voted={liked[a.id] !== undefined}
 								onHelpful={() => void onHelpful(a)}
@@ -264,80 +266,9 @@ export default function QuestionThreadPage() {
 	)
 }
 
-function AnswerCard({
-	a,
-	top,
-	voted,
-	onHelpful,
-	onConsult,
-}: {
-	a: DoctorAnswer & { likes: number }
-	top: boolean
-	voted: boolean
-	onHelpful: () => void
-	onConsult: () => void
-}) {
-	return (
-		<View style={[styles.answer, { borderColor: top ? APP_COLORS.mintAccent : APP_COLORS.divider }]}>
-			{top && (
-				<View style={styles.badge}>
-					<AppPathIcon d={FEED_ICONS.check} size={12} strokeWidth={3} color={APP_COLORS.primary} />
-					<Text style={styles.badgeText}>MOST HELPFUL</Text>
-				</View>
-			)}
-			<View style={styles.docRow}>
-				<AppAvatar
-					uri={buildS3Url(a.doctor_avatar ?? null)}
-					name={initialsOf(a.doctor_name)}
-					size={44}
-					borderWidth={0}
-					backgroundColor={APP_COLORS.mint}
-					initialsColor={APP_COLORS.ink}
-				/>
-				<View style={{ flex: 1, minWidth: 0 }}>
-					<View style={styles.nameRow}>
-						<Text style={styles.docName} numberOfLines={1}>
-							{a.doctor_name}
-						</Text>
-						<View style={styles.verified}>
-							<AppPathIcon d={FEED_ICONS.check} size={10} strokeWidth={3.4} color="#FFFFFF" />
-						</View>
-					</View>
-					<Text style={styles.docRole} numberOfLines={1}>
-						{[a.doctor_specialty, a.doctor_hospital].filter(Boolean).join(' · ')}
-					</Text>
-				</View>
-			</View>
-			<Text style={styles.answerText}>{a.answer}</Text>
-			<Text style={styles.when}>{relativeTime(a.created_at)}</Text>
-			<View style={styles.actions}>
-				<Pressable
-					onPress={onHelpful}
-					accessibilityRole="button"
-					accessibilityState={{ selected: voted }}
-					style={[styles.helpful, voted && styles.helpfulOn]}
-				>
-					<AppPathIcon
-						d={FEED_ICONS.thumb}
-						size={16}
-						strokeWidth={2}
-						color={voted ? APP_COLORS.primary : APP_COLORS.ink}
-						fill={voted ? APP_COLORS.mint : 'none'}
-					/>
-					<Text style={[styles.helpfulText, { color: voted ? APP_COLORS.primary : APP_COLORS.ink }]}>
-						Helpful · {a.likes}
-					</Text>
-				</Pressable>
-				<Pressable onPress={onConsult} accessibilityRole="button" style={styles.consult}>
-					<Text style={styles.consultText}>Consult</Text>
-				</Pressable>
-			</View>
-		</View>
-	)
-}
-
 const styles = StyleSheet.create({
 	page: { flex: 1, backgroundColor: APP_COLORS.pageBg },
+	answerSlot: { marginHorizontal: 16, marginBottom: 12 },
 	top: {
 		flexDirection: 'row',
 		alignItems: 'center',
@@ -383,63 +314,6 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	waitingText: { flex: 1, fontSize: 13, lineHeight: 19, color: AMBER },
-	answer: {
-		marginHorizontal: 16,
-		marginBottom: 12,
-		padding: 14,
-		borderRadius: 12,
-		borderWidth: 1,
-		backgroundColor: '#FFFFFF',
-		gap: 10,
-	},
-	badge: {
-		alignSelf: 'flex-start',
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 4,
-		paddingHorizontal: 8,
-		height: 22,
-		borderRadius: 6,
-		backgroundColor: APP_COLORS.mint,
-	},
-	badgeText: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.5, color: APP_COLORS.primary },
-	docRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-	nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-	docName: { flexShrink: 1, fontSize: 15, lineHeight: 20, fontWeight: '800', color: APP_COLORS.ink },
-	verified: {
-		width: 16,
-		height: 16,
-		borderRadius: 9999,
-		backgroundColor: GREEN,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	docRole: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
-	answerText: { fontSize: 15, lineHeight: 23, color: APP_COLORS.ink },
-	when: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
-	actions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
-	helpful: {
-		height: 40,
-		paddingHorizontal: 14,
-		borderRadius: 10,
-		borderWidth: 1,
-		borderColor: APP_COLORS.divider,
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		backgroundColor: '#FFFFFF',
-	},
-	helpfulOn: { borderColor: APP_COLORS.primary, backgroundColor: APP_COLORS.mint },
-	helpfulText: { fontSize: 13, fontWeight: '700' },
-	consult: {
-		height: 40,
-		paddingHorizontal: 20,
-		borderRadius: 10,
-		backgroundColor: APP_COLORS.primary,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	consultText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
 	note: {
 		marginHorizontal: 16,
 		marginTop: 4,

@@ -85,6 +85,7 @@ npx expo prebuild --platform android       # applies app.json + plugins/ to the 
 - [docs/push-and-offers.md](docs/push-and-offers.md): push channels and taps, care-request card with Accept / Decline, native ring (own sound, overlay, lock screen).
 - [docs/navigation.md](docs/navigation.md): navigators and the server-driven sidebar / tab bar.
 - [docs/consultation-vitals.md](docs/consultation-vitals.md): the doctor's vitals card and sheet.
+- [docs/health-questions.md](docs/health-questions.md): the patient's My questions and the doctor's My answers (the shared question card, `scope=mine` / `answered_by_me`, "new" tracking).
 - [docs/medical-records.md](docs/medical-records.md): the patient's records list, upload and viewer.
 - [docs/app-updates.md](docs/app-updates.md): the launch-time update check.
 - [docs/care-ai.md](docs/care-ai.md): the Care AI chat: how a message goes to the backend chatbot, how a reply is drawn, recent chats, and what is not built yet.

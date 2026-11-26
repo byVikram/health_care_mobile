@@ -50,6 +50,10 @@ import HealthReadsPage from '../features/health-feed/HealthReadsPage'
 import ReadArticlePage from '../features/health-feed/ReadArticlePage'
 import HealthQuestionsPage from '../features/health-feed/HealthQuestionsPage'
 import QuestionThreadPage from '../features/health-feed/QuestionThreadPage'
+import MyQuestionsPage from '../features/health-feed/MyQuestionsPage'
+import MyQuestionDetailPage from '../features/health-feed/MyQuestionDetailPage'
+import MyAnswersPage from '../features/doctor/dashboard/MyAnswersPage'
+import MyAnswerDetailPage from '../features/doctor/dashboard/MyAnswerDetailPage'
 import RadiologyBookingPage from '../features/radiology/RadiologyBookingPage'
 import RadiologyBookingDetailsPage from '../features/radiology/RadiologyBookingDetailsPage'
 import RadiologySearchPage from '../features/radiology/RadiologySearchPage'
@@ -136,6 +140,10 @@ function AuthenticatedNavigator() {
 				<AppStack.Screen name={ROUTES.STACK.BLOG_ARTICLE as keyof AppStackParamList} component={ReadArticlePage} options={{ headerShown: false }} />
 				<AppStack.Screen name={ROUTES.STACK.PATIENT_QUESTIONS_LIST as keyof AppStackParamList} component={HealthQuestionsPage} options={{ headerShown: false }} />
 				<AppStack.Screen name={ROUTES.STACK.PATIENT_QUESTION_DETAIL as keyof AppStackParamList} component={QuestionThreadPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_MY_QUESTIONS as keyof AppStackParamList} component={MyQuestionsPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.PATIENT_MY_QUESTION_DETAIL as keyof AppStackParamList} component={MyQuestionDetailPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_MY_ANSWERS as keyof AppStackParamList} component={MyAnswersPage} options={{ headerShown: false }} />
+				<AppStack.Screen name={ROUTES.STACK.DOCTOR_MY_ANSWER_DETAIL as keyof AppStackParamList} component={MyAnswerDetailPage} options={{ headerShown: false }} />
 
 				<AppStack.Screen
 					name={ROUTES.STACK.RADIOLOGY_ORDERS as keyof AppStackParamList}
