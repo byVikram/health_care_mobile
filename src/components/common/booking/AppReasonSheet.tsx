@@ -1,13 +1,13 @@
-// src/features/ancillary/staff/schedule/ReasonSheet.tsx
+// src/components/common/booking/AppReasonSheet.tsx
 //
-// The "why?" sheet of the ancillary schedule design (release a day, can't make an instant visit, hide a job) on the shared
+// The "why?" sheet (release a day, can't make an instant visit, hide a job; any "tell us why you are doing this" confirmation) on the shared
 // AppCancelSheet: who and when, a required reason, an optional note for the care team, a mint info box and Back / confirm buttons. The
 // caller runs the action: `onConfirm` gets the picked reason and the note and returns how it went; the sheet shows the confirmation or
 // the error, and `onDone` is the follow-up.
 import React from 'react'
-import { AppCancelSheet, type AppCancelResult } from '../../../../components/common'
+import { AppCancelSheet, type AppCancelResult } from './AppCancelSheet'
 
-export type ReasonSheetProps = {
+export type AppReasonSheetProps = {
 	visible: boolean
 	title: string
 	subtitle?: string
@@ -30,7 +30,7 @@ export type ReasonSheetProps = {
 	onDone?: () => void
 }
 
-export function ReasonSheet({
+export function AppReasonSheet({
 	visible,
 	title,
 	subtitle,
@@ -46,7 +46,7 @@ export function ReasonSheet({
 	onClose,
 	onConfirm,
 	onDone,
-}: ReasonSheetProps) {
+}: AppReasonSheetProps) {
 	return (
 		<AppCancelSheet
 			visible={visible}

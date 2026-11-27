@@ -2,8 +2,8 @@
 //
 // "Can't make it? Cancel visit" (visit details design) on the shared AppCancelSheet: a reason list (required), a message to the patient,
 // and Keep visit / Cancel visit; the sheet then shows the "Visit cancelled" confirmation (or the error) and "Back to Today" closes it.
-// Cancelling hands the visit back to dispatch (the patient is refunded / it is re-sent to other providers); the picked reason is also
-// filed as a visit issue (POST /provider/me/visits/{id}/issues). When the reason is "running late" the sheet offers the running-late
+// Cancelling hands the visit back to dispatch (the patient is refunded / it is re-sent to other providers); the picked reason and the note
+// go with the release itself (no separate visit issue is filed). When the reason is "running late" the sheet offers the running-late
 // sheet instead (the patient is told how many minutes).
 // A booking of several days asks WHAT is cancelled: only this visit (the default: her other days stay hers), or this one and every later
 // day she holds (POST /provider/me/visits/{id}/release, scope DAY / REMAINING). A single visit, an instant one, and an older order the
@@ -15,18 +15,15 @@ import ApiService from '../../../../services/apiService'
 import { showComingSoon } from '../../../../utils/toast'
 import { extractApiErrorMessage } from '../../ancillaryService'
 import { apiErrorCode, releaseVisitDay, type ReleaseScope } from '../../providerOpenJobsService'
-import { reportVisitIssue, type VisitIssueReason } from '../../providerVisitService'
-
-type CancelReason = { label: string; issue: VisitIssueReason }
 
 const LATE_REASON = 'Stuck in traffic or running very late'
 
-const CANCEL_REASONS: CancelReason[] = [
-	{ label: LATE_REASON, issue: 'RUNNING_LATE' },
-	{ label: 'Emergency or feeling unwell', issue: 'CANT_MAKE_IT' },
-	{ label: 'Vehicle problem', issue: 'CANT_MAKE_IT' },
-	{ label: 'Can’t find or reach the address', issue: 'ADDRESS_NOT_FOUND' },
-	{ label: 'Other reason', issue: 'OTHER' },
+const CANCEL_REASONS = [
+	LATE_REASON,
+	'Emergency or feeling unwell',
+	'Vehicle problem',
+	'Can’t find or reach the address',
+	'Other reason',
 ]
 
 export type CancelVisitSheetProps = {
@@ -75,20 +72,18 @@ export function CancelVisitSheet({
 	const askScope = !instant && visitsCount > dayIndex
 
 	const submit = async (picked: string | null, note: string): Promise<AppCancelResult> => {
-		const chosen = CANCEL_REASONS.find((r) => r.label === picked)
+		const chosen = CANCEL_REASONS.find((r) => r === picked)
 		if (!chosen) return { ok: false, error: 'Pick a reason.' }
 		try {
-			const text = [chosen.label, note].filter(Boolean).join(' - ')
-			// Support trail for ops, noted BEFORE the cancel: once the visit is handed back the nurse no longer holds it and the server
-			// refuses her note (403), which the app then showed as an "Access Denied" dialog although the cancel had worked. A note
-			// that cannot be saved is not worth stopping the cancel for.
-			await reportVisitIssue(visitId, chosen.issue, text, { silent: true }).catch(() => undefined)
+			const text = [chosen, note].filter(Boolean).join(' - ')
+			// The reason (and note) go with the release itself, which the server stores: no separate issue is filed first (a stale issue
+			// stayed behind when the release failed, and "running late" next to a release contradicted itself).
 			// A booking of several days gives back only what she chose; everything else (a single or instant visit, an older order the
 			// server cannot split: 409 RELEASE_NOT_SUPPORTED) goes back whole, as it always did.
 			let whole = !askScope
 			if (askScope) {
 				try {
-					await releaseVisitDay(visitId, scope, chosen.label, note)
+					await releaseVisitDay(visitId, scope, chosen, note)
 				} catch (e) {
 					if (apiErrorCode(e) !== 'RELEASE_NOT_SUPPORTED') throw e
 					whole = true
@@ -97,7 +92,7 @@ export function CancelVisitSheet({
 			if (whole) await ApiService.post(API_ENDPOINTS.ANCILLARY.CANCEL_PROVIDER(requestId), { reason: text })
 			return {
 				ok: true,
-				message: `Reason: ${chosen.label}. ${
+				message: `Reason: ${chosen}. ${
 					whole
 						? `${patientFirstName} has been refunded and we’re finding another provider.`
 						: scope === 'DAY'
@@ -121,7 +116,7 @@ export function CancelVisitSheet({
 				title: patientName,
 				line: [instant ? 'Instant visit' : null, serviceTitle].filter(Boolean).join(' · '),
 			}}
-			reasons={CANCEL_REASONS.map((r) => r.label)}
+			reasons={CANCEL_REASONS}
 			reasonRequired
 			onReasonChange={setReason}
 			choice={

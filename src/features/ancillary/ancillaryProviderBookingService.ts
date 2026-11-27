@@ -94,9 +94,12 @@ export interface AncillaryOrderVisit {
 	provider?: AncillaryOrderProvider | null
 	/** The patient moved this visit to another day / time. */
 	rescheduled?: boolean
-	/** Server rules: free to move until its provider is assigned, free to cancel up to the cancel cutoff. */
+	/** Server rules: free to move until its provider is assigned, free to cancel up to the cancel cutoff (an accepted day too). */
 	can_reschedule?: boolean
 	can_cancel?: boolean
+	/** The provider told the patient she is running about this many minutes late (null / absent: not late). */
+	running_late_minutes?: number | null
+	runningLateMinutes?: number | null
 	// Provider app rows (GET /provider/me/orders and Today; absent from an older backend and on the patient's own view).
 	booking_type?: string | null
 	/** When THIS provider took the visit. */
@@ -301,6 +304,24 @@ export const getProviderOrdersFiltered = async (
 	const orders = res.data?.data ?? []
 	const header = Number((res.headers as Record<string, unknown> | undefined)?.['x-total-count'])
 	return { orders, total: Number.isFinite(header) ? header : orders.length }
+}
+
+/** Orders a page of the Schedule asks for at most (the server caps a page at 100). */
+const SCHEDULE_PAGE_SIZE = 100
+
+/**
+ * What the provider Schedule shows, without reading her whole history: the orders with a visit from `from` to `to` (any status, so
+ * "Earlier today" and the next weeks are there) plus every order still active whatever its date (a visit that is under way, or one
+ * from before `from` she has not finished). Two reads, merged by order.
+ */
+export const getProviderScheduleOrders = async (from: string, to: string): Promise<ProviderScheduledOrder[]> => {
+	const [windowed, active] = await Promise.all([
+		getProviderOrdersFiltered({ from, to, page: 1, page_size: SCHEDULE_PAGE_SIZE }),
+		getProviderScheduledOrders('CONFIRMED'),
+	])
+	const byId = new Map<string, ProviderScheduledOrder>()
+	for (const o of [...windowed.orders, ...active]) byId.set(o.request_public_id, o)
+	return [...byId.values()]
 }
 
 export const getProviderScheduledOrders = async (statusFilter = 'ALL'): Promise<ProviderScheduledOrder[]> => {

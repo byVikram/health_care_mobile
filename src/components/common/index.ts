@@ -191,6 +191,8 @@ export type {
 	AppCancelSheetProps,
 	AppCancelSummary,
 } from './booking/AppCancelSheet'
+export { AppReasonSheet } from './booking/AppReasonSheet'
+export type { AppReasonSheetProps } from './booking/AppReasonSheet'
 export { AppRescheduleSheet, AppRescheduleGroup } from './booking/AppRescheduleSheet'
 export type { AppRescheduleSheetProps, AppRescheduleResult, AppRescheduleOk } from './booking/AppRescheduleSheet'
 export { useSheetOutcome, sheetErrorMessage } from './booking/useSheetOutcome'

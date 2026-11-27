@@ -9,44 +9,26 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useIsFocused, useNavigation, type NavigationProp } from '@react-navigation/native'
-import Toast from 'react-native-toast-message'
 import {
 	AppInfoBanner,
 	AppPathIcon,
+	AppReasonSheet,
 	AppScreenHeader,
 	AppSegmentedControl,
-	type AppCancelResult,
 } from '../../../components/common'
 import { APP_COLORS } from '../../../config/theme'
 import { ROUTES } from '../../../navigation/routes'
 import { useTabBarClearance } from '../../../navigation/tabBar'
 import type { AppStackParamList } from '../../../navigation/types'
-import { callPhone, openDirections, openOnMap } from '../../../utils/maps'
 import { formatTimeSlot } from '../../../utils/formatters'
-import { extractApiErrorMessage } from '../ancillaryService'
-import {
-	acceptOpenJob,
-	apiErrorCode,
-	hideOpenJob,
-	isStaleJobError,
-	releaseVisitDay,
-	type OpenJob,
-	type ReleaseScope,
-} from '../providerOpenJobsService'
-import {
-	getProviderVisit,
-	markVisitOnTheWay,
-	releaseOrder,
-	reportVisitIssue,
-	type VisitIssueReason,
-} from '../providerVisitService'
+import { clinicNowHms } from '../../doctor/scheduleUtils'
 import { ScheduleCalendarSheet } from '../../doctor/dashboard/ScheduleCalendarSheet'
 import { InstantRequestCard } from './schedule/InstantRequestCard'
-import { ManageVisitSheet, type ManageAction } from './schedule/ManageVisitSheet'
+import { ManageVisitSheet } from './schedule/ManageVisitSheet'
 import { OpenJobView } from './schedule/OpenJobView'
 import { OpenJobsSection } from './schedule/OpenJobsSection'
 import { PastVisitsView } from './schedule/PastVisitsView'
-import { ReasonSheet } from './schedule/ReasonSheet'
+import { ReleaseVisitSheet } from './schedule/ReleaseVisitSheet'
 import { RunningLateSheet } from './schedule/RunningLateSheet'
 import { PAST_KEY, ScheduleDayStrip } from './schedule/ScheduleDayStrip'
 import { ScheduleCard, ScheduleVisitRow, SubLine, TimeColumn } from './schedule/ScheduleVisitRow'
@@ -62,6 +44,8 @@ import {
 } from './schedule/scheduleModel'
 import { PATHS, SCH } from './schedule/scheduleTheme'
 import { useProviderSchedule } from './schedule/useProviderSchedule'
+import { TakeJobSheet } from './schedule/TakeJobSheet'
+import { useScheduleActions } from './schedule/useScheduleActions'
 import { useScheduleOffer } from './schedule/useScheduleOffer'
 
 type Filter = 'all' | VisitKind
@@ -72,45 +56,64 @@ const FILTER_OPTIONS = [
 	{ value: 'scheduled' as const, label: 'Scheduled' },
 ]
 
-/** Why a visit is given back, as the design words it, and how the care team files it. */
-const RELEASE_REASONS: { label: string; issue: VisitIssueReason }[] = [
-	{ label: 'Not available that day', issue: 'CANT_MAKE_IT' },
-	{ label: 'Emergency / unwell', issue: 'CANT_MAKE_IT' },
-	{ label: 'Clash with another visit', issue: 'CANT_MAKE_IT' },
-	{ label: 'Other reason', issue: 'OTHER' },
-]
-const INSTANT_REASONS: { label: string; issue: VisitIssueReason }[] = [
-	{ label: 'Stuck in traffic / too far', issue: 'RUNNING_LATE' },
-	{ label: 'Previous visit running long', issue: 'RUNNING_LATE' },
-	{ label: 'Emergency / unwell', issue: 'CANT_MAKE_IT' },
-	{ label: 'Other reason', issue: 'OTHER' },
-]
-
 export default function ProviderSchedulePage() {
 	const clearance = useTabBarClearance()
 	const isFocused = useIsFocused()
 	const navigation = useNavigation<NavigationProp<AppStackParamList>>()
-	const { visits, openJobs, today, loading, loaded, error, reload } = useProviderSchedule()
+	const { visits, openJobs, today, online, loading, loaded, error, reload } = useProviderSchedule()
 
 	const [selected, setSelected] = useState('')
 	const [filter, setFilter] = useState<Filter>('all')
 	const [doneOpen, setDoneOpen] = useState(false)
 	const [calendarOpen, setCalendarOpen] = useState(false)
-	const [manage, setManage] = useState<ScheduleVisit | null>(null)
-	const [releasing, setReleasing] = useState<ScheduleVisit | null>(null)
-	/** What a release gives back: this day only, or this day and the later ones she holds. */
-	const [releaseScope, setReleaseScope] = useState<ReleaseScope>('DAY')
-	const [late, setLate] = useState<ScheduleVisit | null>(null)
-	const [job, setJob] = useState<OpenJob | null>(null)
-	const [jobBusy, setJobBusy] = useState(false)
-	const [declining, setDeclining] = useState<OpenJob | null>(null)
-
 	// Until the user picks a day, the schedule shows today (the date can change under an open screen: read it each render).
 	const day = selected || today
 	const isPast = day === PAST_KEY
 	const days = useMemo(() => stripDays(today), [today])
+
+	const openVisit = useCallback(
+		(v: ScheduleVisit) => {
+			if (!v.visitId) return
+			navigation.navigate(
+				v.inProgress ? ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS : ROUTES.STACK.PROVIDER_VISIT_DETAILS,
+				{
+					visitId: v.visitId,
+				}
+			)
+		},
+		[navigation]
+	)
+
+	const {
+		manage,
+		setManage,
+		releasing,
+		setReleasing,
+		releaseScope,
+		late,
+		setLate,
+		job,
+		setJob,
+		jobBusy,
+		declining,
+		setDeclining,
+		taking,
+		setTaking,
+		remainingDays,
+		runAction,
+		confirmRelease,
+		acceptJob,
+		pickNeeded,
+		confirmTake,
+		declineJob,
+	} = useScheduleActions({ visits, reload, openVisit })
+
 	const offerOn = isFocused && !isPast && day === today && !job
-	const offerState = useScheduleOffer({ enabled: isFocused && !job, onAccepted: () => void reload() })
+	// Offers are polled only while she is online: an offline nurse is offered nothing (unknown still polls).
+	const offerState = useScheduleOffer({
+		enabled: isFocused && !job && online !== false,
+		onAccepted: () => void reload(),
+	})
 
 	const dayView = useMemo(
 		() => buildDayView(visits, day, today, day === today ? filter : 'all'),
@@ -126,183 +129,12 @@ export default function ProviderSchedulePage() {
 	const markedDays = useMemo(() => new Set(visits.filter((v) => v.state === 'active').map((v) => v.date)), [visits])
 
 	const nextVisitLine = useMemo(() => {
-		const now = new Date()
-		const nowHm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+		const nowHm = clinicNowHms().slice(0, 5)
 		const next = activeOn(visits, today)
 			.filter((v) => v.startTime && v.startTime > nowHm)
 			.sort((a, b) => a.startTime.localeCompare(b.startTime))[0]
 		return next ? `Your next visit: ${formatTimeSlot(next.startTime)} with ${next.patientName}` : null
 	}, [visits, today])
-
-	const openVisit = useCallback(
-		(v: ScheduleVisit) => {
-			if (!v.visitId) return
-			navigation.navigate(
-				v.inProgress ? ROUTES.STACK.PROVIDER_VISIT_IN_PROGRESS : ROUTES.STACK.PROVIDER_VISIT_DETAILS,
-				{
-					visitId: v.visitId,
-				}
-			)
-		},
-		[navigation]
-	)
-
-	/** How many days of the booking she holds from this one on (this day and the later ones). */
-	const remainingDays = (v: ScheduleVisit) =>
-		visits.filter(
-			(x) =>
-				x.orderId === v.orderId &&
-				x.state === 'active' &&
-				(x.date > v.date || (x.date === v.date && x.startTime >= v.startTime))
-		).length
-
-	const runAction = async (action: ManageAction, v: ScheduleVisit) => {
-		if (action === 'details') {
-			setManage(null)
-			openVisit(v)
-			return
-		}
-		if (action === 'release' || action === 'releaseDay' || action === 'releaseRest') {
-			setManage(null)
-			setReleaseScope(action === 'releaseRest' ? 'REMAINING' : 'DAY')
-			setReleasing(v)
-			return
-		}
-		if (action === 'late') {
-			setManage(null)
-			setLate(v)
-			return
-		}
-		setManage(null)
-		try {
-			if (action === 'navigate' || action === 'call') {
-				const detail = v.visitId ? await getProviderVisit(v.visitId) : null
-				if (action === 'navigate') {
-					if (detail) {
-						await openDirections(
-							detail.address.latitude,
-							detail.address.longitude,
-							detail.address.street_address
-						)
-					} else {
-						openOnMap(v.address, undefined)
-					}
-				} else if (detail?.patient.phone) {
-					await callPhone(detail.patient.phone)
-				} else {
-					Toast.show({ type: 'info', text1: 'No phone number for this patient' })
-				}
-			} else if (action === 'onTheWay' && v.visitId) {
-				await markVisitOnTheWay(v.visitId, true)
-				Toast.show({ type: 'success', text1: `${v.patientName} can see you are on the way` })
-				void reload()
-			}
-		} catch (e) {
-			Toast.show({
-				type: 'error',
-				text1: 'That did not work',
-				text2: extractApiErrorMessage(e, 'Please try again.'),
-			})
-		}
-	}
-
-	/** Gives the visit back and returns how it went: the reason sheet shows the confirmation, or the error. */
-	const confirmRelease = async (reason: string, note: string): Promise<AppCancelResult> => {
-		if (!releasing) return { ok: false, error: 'Please try again.' }
-		const reasons = releasing.kind === 'instant' ? INSTANT_REASONS : RELEASE_REASONS
-		const issue = reasons.find((r) => r.label === reason)?.issue ?? 'OTHER'
-		const text = [reason, note].filter(Boolean).join(' - ')
-		try {
-			// Noted for the care team BEFORE the hand-back: once the visit is given back the provider no longer holds it and the server
-			// refuses her note. A note that cannot be saved is not worth stopping the release for.
-			if (releasing.visitId)
-				await reportVisitIssue(releasing.visitId, issue, text, { silent: true }).catch(() => undefined)
-			// A visit of a booking sent out day by day goes back out by itself: this day, or this and the later ones. An instant visit, and
-			// an older order that was never sent out that way (409 RELEASE_NOT_SUPPORTED), go back as the whole order.
-			let wholeOrder = releasing.kind === 'instant' || !releasing.visitId
-			if (!wholeOrder && releasing.visitId) {
-				try {
-					await releaseVisitDay(releasing.visitId, releaseScope, reason, note)
-				} catch (e) {
-					if (apiErrorCode(e) !== 'RELEASE_NOT_SUPPORTED') throw e
-					wholeOrder = true
-				}
-			}
-			if (wholeOrder) await releaseOrder(releasing.orderId, text)
-			void reload()
-			return { ok: true }
-		} catch (e) {
-			return { ok: false, error: extractApiErrorMessage(e, 'Please try again.') }
-		}
-	}
-
-	/**
-	 * A refused job call. Someone else took it, or a day is no longer open: the list was out of date, so say so and re-read it.
-	 * Anything else (a clash with a visit she holds, no connection) shows the server's own sentence and leaves the job open.
-	 */
-	const onJobError = (e: unknown, title: string) => {
-		if (isStaleJobError(e)) {
-			Toast.show({
-				type: 'info',
-				text1:
-					apiErrorCode(e) === 'ALREADY_TAKEN' ? 'Someone else just took this' : 'That day is no longer open',
-				text2: extractApiErrorMessage(e, 'Your list has been refreshed.'),
-			})
-			setJob(null)
-			setDeclining(null)
-			void reload()
-			return
-		}
-		Toast.show({ type: 'error', text1: title, text2: extractApiErrorMessage(e, 'Please try again.') })
-	}
-
-	const acceptJob = async (j: OpenJob, dates: string[]) => {
-		setJobBusy(true)
-		try {
-			const res = await acceptOpenJob(j.id, dates)
-			setJob(null)
-			void reload()
-			// What the server really gave her: a day someone took meanwhile is not in `acceptedDates`.
-			const taken = res.acceptedDates.map(longDay)
-			const left = (
-				res.openDates.length
-					? res.openDates
-					: j.days.filter((d) => !res.acceptedDates.includes(d.date)).map((d) => d.date)
-			).map(longDay)
-			const first = j.patientName
-			Toast.show({
-				type: 'success',
-				text1: left.length
-					? `Added ${taken.join(', ')} · ${left.join(', ')} stays open for other nurses`
-					: j.days.length > 1
-						? `All ${j.days.length} days with ${first} added to your schedule`
-						: `Visit with ${first} added to your schedule`,
-			})
-		} catch (e) {
-			onJobError(e, 'Could not pick up this job')
-		} finally {
-			setJobBusy(false)
-		}
-	}
-
-	/**
-	 * Hides the job from her. It is a quick dismissal, not a cancellation: the sheet closes and a toast says so (a failure stays in the
-	 * sheet). A job someone took meanwhile (or a day no longer open) is gone, so there is nothing left to hide: `onJobError` says so in a
-	 * toast, closes the sheet and the job view and re-reads the list, and the sheet has nothing more to show (`carryOn`).
-	 */
-	const declineJob = async (j: OpenJob, reason: string): Promise<AppCancelResult> => {
-		try {
-			await hideOpenJob(j.id, reason)
-			void reload()
-			return { ok: true }
-		} catch (e) {
-			if (isStaleJobError(e)) {
-				onJobError(e, 'Could not hide this job')
-				return { ok: true, carryOn: true }
-			}
-			return { ok: false, error: extractApiErrorMessage(e, 'Please try again.') }
-		}
-	}
 
 	// ---- The open job view replaces the schedule while a booking is being looked at. ----
 	if (job) {
@@ -319,7 +151,7 @@ export default function ProviderSchedulePage() {
 					onDecline={() => setDeclining(job)}
 				/>
 				{declining && (
-					<ReasonSheet
+					<AppReasonSheet
 						visible
 						title="Not for you?"
 						subtitle="We’ll stop showing this job in your schedule."
@@ -355,8 +187,6 @@ export default function ProviderSchedulePage() {
 	}
 
 	const isToday = day === today
-	const relMany = releasing ? remainingDays(releasing) > 1 : false
-	const relRest = relMany && releaseScope === 'REMAINING'
 	const showSeg = isToday && !isPast
 	const neededVisible = isToday && (filter === 'all' || filter === 'instant')
 	const nearbyVisible = !isPast && (filter === 'all' || filter === 'scheduled' || !isToday)
@@ -478,12 +308,8 @@ export default function ProviderSchedulePage() {
 								kind="needed"
 								jobs={openJobs.needed}
 								day={day}
-								onPick={(j) =>
-									void acceptJob(
-										j,
-										j.days.map((d) => d.date)
-									)
-								}
+								online={online}
+								onPick={pickNeeded}
 							/>
 						)}
 
@@ -569,69 +395,16 @@ export default function ProviderSchedulePage() {
 			/>
 
 			{releasing && (
-				<ReasonSheet
-					visible
-					title={
-						releasing.kind === 'instant'
-							? 'Can’t make it?'
-							: relRest
-								? 'Release remaining days?'
-								: relMany
-									? 'Release this day?'
-									: 'Release this visit?'
-					}
-					subtitle={
-						releasing.kind === 'instant'
-							? `${releasing.patientName.split(' ')[0]} is waiting for you.`
-							: relRest
-								? `You’ll stop visiting ${releasing.patientName} from ${longDay(releasing.date)}.`
-								: relMany
-									? `Only ${longDay(releasing.date)}. Your other days with ${releasing.patientName} stay yours.`
-									: undefined
-					}
-					who={releasing.patientName}
-					line={[
-						releasing.kind === 'instant' ? 'Instant visit' : longDay(releasing.date),
-						releasing.startTime ? formatTimeSlot(releasing.startTime) : null,
-						releasing.care,
-					]
-						.filter(Boolean)
-						.join(' · ')}
-					reasons={(releasing.kind === 'instant' ? INSTANT_REASONS : RELEASE_REASONS).map((r) => r.label)}
-					notePlaceholder="Note for the care team (optional)"
-					info={
-						releasing.kind === 'instant'
-							? `We’ll offer this visit to other nurses nearby right away and tell ${releasing.patientName.split(' ')[0]}.`
-							: 'We’ll offer it to other nurses nearby and tell the family who’s coming. Release at least 12 hours before the visit when you can.'
-					}
-					confirmLabel={
-						releasing.kind === 'instant'
-							? 'Cancel instant visit'
-							: relRest
-								? `Release ${remainingDays(releasing)} days`
-								: relMany
-									? 'Release this day'
-									: 'Release this visit'
-					}
-					successTitle={
-						releasing.kind === 'instant'
-							? 'Instant visit passed on'
-							: relRest
-								? 'Days released'
-								: 'Visit released'
-					}
-					successMessage={
-						releasing.kind === 'instant'
-							? 'We’ve offered it to other nurses nearby.'
-							: relRest
-								? 'We’re finding other nurses.'
-								: 'We’re finding another nurse.'
-					}
+				<ReleaseVisitSheet
+					visit={releasing}
+					remainingDays={remainingDays(releasing)}
+					scope={releaseScope}
 					onClose={() => setReleasing(null)}
-					onDone={() => setReleasing(null)}
 					onConfirm={confirmRelease}
 				/>
 			)}
+
+			<TakeJobSheet job={taking} onClose={() => setTaking(null)} onConfirm={confirmTake} />
 
 			{late && late.visitId ? (
 				<RunningLateSheet

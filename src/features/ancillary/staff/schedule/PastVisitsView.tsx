@@ -65,7 +65,7 @@ export function PastVisitsView({ today, onOpenVisit }: Props) {
 	const [sheetOpen, setSheetOpen] = useState(false)
 	const [pages, setPages] = useState(1)
 
-	const { visits, loading, error } = usePastVisits(filters, today)
+	const { visits, loading, loadingMore, hasMore, loadMore, error } = usePastVisits(filters, today)
 	const past = useMemo(() => buildPast(visits, filters, today), [visits, filters, today])
 	const shown = past.days.slice(0, pages * DAYS_PER_PAGE)
 	const filterCount = pastFilterCount(filters)
@@ -178,8 +178,17 @@ export function PastVisitsView({ today, onOpenVisit }: Props) {
 				</View>
 			)}
 
-			{past.days.length > shown.length && (
-				<AppButton variant="outline" onPress={() => setPages((p) => p + 1)}>
+			{(past.days.length > shown.length || hasMore) && (
+				<AppButton
+					variant="outline"
+					loading={loadingMore}
+					disabled={loadingMore}
+					onPress={() => {
+						// Older days already read are shown first; once they are all shown, the next page is read from the server.
+						if (past.days.length <= shown.length) loadMore()
+						setPages((p) => p + 1)
+					}}
+				>
 					Show older visits
 				</AppButton>
 			)}

@@ -42,6 +42,7 @@ import {
 	type ProviderToday,
 	type ProviderVisitSummary,
 } from '../../providerVisitService'
+import { clinicTimeHm } from '../../../doctor/scheduleUtils'
 import { getProviderSpecialityCopy } from '../providerSpecialityCopy'
 import { PATHS } from '../schedule/scheduleTheme'
 import { todayIso as todayIsoOf } from '../schedule/scheduleModel'
@@ -49,12 +50,13 @@ import { IncomingOfferSheet, type OfferPhase } from './IncomingOfferSheet'
 import { NeedsActionList, type ActionRow } from './NeedsActionList'
 import { VisitNotesSheet } from '../visit/VisitNotesSheet'
 import { ProviderHomeHeader } from './ProviderHomeHeader'
+import { RunningLateSheet } from '../schedule/RunningLateSheet'
 import { UpNextCarousel } from './UpNextCarousel'
 import { useOverlayPermission } from './useOverlayPermission'
 import { useProviderDispatchSocket } from './useProviderDispatchSocket'
 import { useProviderOnline } from './useProviderOnline'
 import { isInstantOffer, offerCollect, offerSeenAtMs, shortDay, tipLabel } from './todayView'
-import { toUpNextCard, upNextVisits } from './upNextView'
+import { toUpNextCard, upNextVisits, type UpNextCard } from './upNextView'
 
 const REFRESH_MS = 60_000
 /** The buzz when an instant request opens its sheet in the open app (the closed app's notification buzzes on its own channel). */
@@ -75,6 +77,8 @@ export function ProviderTodayContent() {
 	const [nowMs, setNowMs] = useState(() => Date.now())
 	const [focused, setFocused] = useState(false)
 	const [notificationCount, setNotificationCount] = useState(0)
+	/** The Up next card whose "Running late?" sheet is open. */
+	const [lateCard, setLateCard] = useState<UpNextCard | null>(null)
 	const [radiusKm, setRadiusKm] = useState<number | null>(null)
 	const [areaName, setAreaName] = useState<string | null>(null)
 	const [openJobs, setOpenJobs] = useState<OpenJobs>(NO_OPEN_JOBS)
@@ -264,9 +268,19 @@ export function ProviderTodayContent() {
 	// A request that ran out on her stays open for other nurses (and for her): read "Needed now" so the sheet can say so.
 	useEffect(() => {
 		if (phase !== 'missed') return
-		void getOpenJobs()
-			.then(setOpenJobs)
-			.catch(() => undefined)
+		let active = true
+		const run = async () => {
+			try {
+				const jobs = await getOpenJobs()
+				if (active) setOpenJobs(jobs)
+			} catch {
+				// Best effort: the sheet just does not say the request is still open.
+			}
+		}
+		void run()
+		return () => {
+			active = false
+		}
 	}, [phase])
 
 	/** A visit in progress opens straight into the in-progress screen; anything else shows its details. */
@@ -366,7 +380,7 @@ export function ProviderTodayContent() {
 	const offline = availability.online === false
 
 	// "Your next visit: 7:00 PM with Vikram K." under an instant request: the first visit still to do today that starts later.
-	const nowHm = `${String(new Date(nowMs).getHours()).padStart(2, '0')}:${String(new Date(nowMs).getMinutes()).padStart(2, '0')}`
+	const nowHm = clinicTimeHm(new Date(nowMs))
 	const nextToday = data
 		? upNextVisits(data.schedule, [])
 				.filter((v) => v.start_time && v.start_time.slice(0, 5) > nowHm)
@@ -520,6 +534,7 @@ export function ProviderTodayContent() {
 						cards={cards}
 						onOpen={(c) => openVisit(c.visit)}
 						onCall={(c) => void callPhone(c.visit.patient.phone)}
+						onRunningLate={setLateCard}
 						onFullSchedule={openSchedule}
 					/>
 				) : data ? (
@@ -539,6 +554,16 @@ export function ProviderTodayContent() {
 				) : null}
 
 				<NeedsActionList rows={actionRows} />
+
+				{lateCard ? (
+					<RunningLateSheet
+						visible
+						visitId={lateCard.id}
+						patientName={lateCard.name}
+						line={[lateCard.when, lateCard.service].filter(Boolean).join(' · ')}
+						onClose={() => setLateCard(null)}
+					/>
+				) : null}
 
 				<IncomingOfferSheet
 					offer={sheetOffer}

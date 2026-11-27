@@ -1,7 +1,8 @@
 // src/features/ancillary/staff/schedule/useScheduleOffer.ts
 //
 // The request card at the top of the Schedule: an offer open to this provider right now (an instant request she has 30 seconds to
-// answer, or a scheduled visit nobody took within the hour). It polls GET /provider/requests/available while the screen is on show,
+// answer, or a scheduled visit nobody took within the hour). It polls GET /provider/requests/available while the screen is on show
+// and she is online (`enabled`: an offline nurse is offered nothing, so there is nothing to ask for),
 // counts down the time the server says is left on her offer (`expiresInMs`; from when this device first saw it with an older
 // backend, the same rule as the Today tab), and accepts / declines
 // through the unchanged offer endpoints. Today's dispatch socket is not opened here: Today keeps ringing the offer; this is the
@@ -90,8 +91,8 @@ export function useScheduleOffer({ enabled, onAccepted }: Options) {
 		setBusy(true)
 		try {
 			const res = await acceptCareRequestBackend(o.requestId)
-			finish(o)
 			if (res.success) {
+				finish(o)
 				Toast.show({
 					type: 'success',
 					text1: 'Request accepted',
@@ -101,8 +102,11 @@ export function useScheduleOffer({ enabled, onAccepted }: Options) {
 				})
 				onAccepted()
 			} else {
+				// Someone else took it, or her offer ended: it is over. Any other refusal (a visit she already holds at that time, she is
+				// offline) leaves the offer on the card while it is still open: only the message is shown.
+				if (res.alreadyClaimed) finish(o)
 				Toast.show({
-					type: 'info',
+					type: res.alreadyClaimed ? 'info' : 'error',
 					text1: res.alreadyClaimed ? 'Too late' : 'Could not accept',
 					text2: res.message ?? 'Please try again.',
 				})

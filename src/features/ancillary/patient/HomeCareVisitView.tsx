@@ -45,6 +45,9 @@ export type TrackingVisit = {
 	/** This visit's status strip. */
 	timeline?: StatusTimeline
 	tasks?: { label: string; done: boolean }[]
+	/** The provider said she is running about this many minutes late (null / absent: not late). */
+	running_late_minutes?: number | null
+	runningLateMinutes?: number | null
 	/** Scheduled visits: the server's verdict on whether the patient can still cancel this visit. */
 	can_cancel?: boolean
 	/** Scheduled visits: the provider of THIS visit (each visit has its own), absent until one is assigned. */
@@ -314,6 +317,9 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 				.filter(Boolean)
 				.join(' · ')
 
+	// "about 20 min late": what the provider told us, until she arrives.
+	const lateMinutes = currentVisit?.running_late_minutes ?? currentVisit?.runningLateMinutes ?? 0
+	const lateText = lateMinutes > 0 && p.status !== 'ARRIVED' ? `about ${lateMinutes} min late` : null
 	const arrivalTitle =
 		p.status === 'ARRIVED'
 			? `${first} has arrived`
@@ -321,10 +327,12 @@ export default function HomeCareVisitView(p: HomeCareVisitViewProps) {
 				? p.etaMinutes != null
 					? `Arriving in ${p.etaMinutes} min`
 					: `${first} is on the way`
-				: `${first} will head to you soon`
+				: lateText
+					? `${first} is running ${lateText}`
+					: `${first} will head to you soon`
 	const arrivalSub =
 		p.status === 'EN_ROUTE'
-			? `${first} is on the way`
+			? `${first} is on the way${lateText ? ` · ${lateText}` : ''}`
 			: p.status === 'ARRIVED'
 				? waitingUntil
 					? `Share your start code at the door · ${first} will wait until ${waitingUntil}`
