@@ -86,7 +86,8 @@ const CANVAS_CAPTURE_TIMEOUT_MS = 1500
 
 type TabId = 'overview' | 'history' | 'reports' | 'notes'
 type NoteMode = 'type' | 'scribble' | 'voice'
-type Phase = 'idle' | 'live' | 'sent'
+// The doctor reaches this screen through the patient's consent OTP, so the visit is already under way: there is no "start" step.
+type Phase = 'live' | 'sent'
 type FollowUpOption = '2wk' | '1month' | '3months' | 'none'
 
 const TABS: { id: TabId; label: string }[] = [
@@ -321,7 +322,7 @@ function DoctorConsultation() {
 
 	// ── UI state ──
 	const [activeTab, setActiveTab] = useState<TabId>('overview')
-	const [phase, setPhase] = useState<Phase>('idle')
+	const [phase, setPhase] = useState<Phase>('live')
 	const [saving, setSaving] = useState(false)
 
 	// ── Notes state ──
@@ -829,10 +830,6 @@ function DoctorConsultation() {
 
 	const handlePrimaryPress = async () => {
 		if (saving || ending.current) return
-		if (phase === 'idle') {
-			setPhase('live')
-			return
-		}
 		if (phase === 'live') {
 			ending.current = true
 			try {
@@ -861,8 +858,8 @@ function DoctorConsultation() {
 		bookingLine: [bookingRef(appointmentId), String(appointment?.appointment_mode ?? '').toLowerCase().includes('video') ? 'Video call' : 'In-clinic'].join(' · '),
 	}
 
-	const primaryLabel = phase === 'idle' ? 'Start consultation' : phase === 'live' ? 'End & share notes' : 'Back to home'
-	const primaryBg = phase === 'idle' ? PRIMARY : phase === 'live' ? INK : PRIMARY
+	const primaryLabel = phase === 'live' ? 'End & share notes' : 'Back to home'
+	const primaryBg = phase === 'live' ? INK : PRIMARY
 
 	// ── Derived: header ──
 	const avatarUri = resolveAvatar(patient)

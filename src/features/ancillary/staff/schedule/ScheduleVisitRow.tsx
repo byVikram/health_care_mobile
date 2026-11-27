@@ -1,8 +1,9 @@
 // src/features/ancillary/staff/schedule/ScheduleVisitRow.tsx
 //
 // One visit on the Schedule (ancillary schedule design): the time and "PM", the patient's name, a line with a bolt (instant) or a
-// house (scheduled) icon + "care · area", then on the right a Start button (a visit of today), a chip ("Day 2 of 5", "Released",
-// "Cancelled"...) and a ⋮ button for the manage sheet. Rows live inside a ScheduleCard (white section with a small caps title).
+// house (scheduled) icon + "care · area" (a visit of a recurring booking: the care on one line, a calendar icon and
+// "Day 2 of 5" on the next), then on the right a Start button (a visit of today), a chip ("Released", "Cancelled"...) and a
+// ⋮ button for the manage sheet. Rows live inside a ScheduleCard (white section with a small caps title).
 import React from 'react'
 import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { AppPathIcon } from '../../../../components/common'
@@ -74,6 +75,11 @@ export function SubLine({ instant, text }: { instant: boolean; text: string }) {
 	)
 }
 
+/** "Day 2 of 5" for a visit of a recurring booking (a line under the care, not a chip beside the buttons). */
+const dayOf = (v: ScheduleVisit): string | null =>
+	v.count > 1 && v.kind === 'scheduled' ? `Day ${v.index} of ${v.count}` : null
+
+/** A chip for what became of a visit (released, cancelled, missed, done); a visit still to do has none. */
 const chipFor = (v: ScheduleVisit): { label: string; bg: string; ink: string } | null => {
 	switch (v.state) {
 		case 'released':
@@ -89,9 +95,7 @@ const chipFor = (v: ScheduleVisit): { label: string; bg: string; ink: string } |
 		case 'done':
 			return { label: 'Completed', bg: APP_COLORS.mint, ink: APP_COLORS.primary }
 		default:
-			return v.count > 1 && v.kind === 'scheduled'
-				? { label: `Day ${v.index} of ${v.count}`, bg: APP_COLORS.mint, ink: APP_COLORS.primary }
-				: null
+			return null
 	}
 }
 
@@ -106,6 +110,7 @@ export function ScheduleVisitRow({ visit, isToday, onOpen, onMore }: RowProps) {
 	const active = visit.state === 'active'
 	const instant = visit.kind === 'instant'
 	const chip = chipFor(visit)
+	const day = dayOf(visit)
 	const timeColor = !active ? SCH.faint : instant ? SCH.instantInk : isToday ? APP_COLORS.primary : APP_COLORS.ink
 	const canStart = active && isToday && !!visit.visitId
 
@@ -124,7 +129,29 @@ export function ScheduleVisitRow({ visit, isToday, onOpen, onMore }: RowProps) {
 						<Text style={styles.name} numberOfLines={1}>
 							{visit.patientName}
 						</Text>
-						<SubLine instant={instant} text={[visit.care, visit.area].filter(Boolean).join(' · ')} />
+						{day ? (
+							<>
+								<SubLine instant={instant} text={visit.care} />
+								<View style={styles.subRow}>
+									<AppPathIcon
+										d={PATHS.calendar}
+										size={12}
+										strokeWidth={2.4}
+										color={APP_COLORS.primary}
+									/>
+									<Text style={styles.sub} numberOfLines={1}>
+										{day}
+									</Text>
+								</View>
+							</>
+						) : (
+							<SubLine instant={instant} text={[visit.care, visit.area].filter(Boolean).join(' · ')} />
+						)}
+						{instant && active && isToday && (
+							<Text style={[styles.note, { color: SCH.instantInk }]}>
+								Accepted · patient is expecting you
+							</Text>
+						)}
 					</View>
 				</Pressable>
 				{canStart && (
@@ -160,11 +187,6 @@ export function ScheduleVisitRow({ visit, isToday, onOpen, onMore }: RowProps) {
 					</TouchableOpacity>
 				)}
 			</View>
-			{instant && active && isToday && (
-				<Text style={[styles.note, { color: SCH.instantInk }]}>
-					Instant · accepted · the patient is expecting you
-				</Text>
-			)}
 		</View>
 	)
 }
@@ -181,13 +203,14 @@ const styles = StyleSheet.create({
 	cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 	cardTitle: { fontSize: 12, lineHeight: 16, fontWeight: '800', letterSpacing: 0.7 },
 	cardSub: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
-	row: { gap: 6, paddingVertical: 12, borderTopWidth: 1, borderTopColor: SCH.rule },
+	row: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: SCH.rule },
 	rowMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 	rowPress: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 12 },
 	timeCol: { width: 56 },
 	time: { fontSize: 14, lineHeight: 18, fontWeight: '800' },
 	ampm: { fontSize: 11, lineHeight: 14, color: APP_COLORS.inkMuted },
-	mid: { flex: 1, minWidth: 0, gap: 2 },
+	// every line of the text column (name, care, day, instant note) is the same distance from the next
+	mid: { flex: 1, minWidth: 0, gap: 3 },
 	name: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: APP_COLORS.ink },
 	subRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 	sub: { flexShrink: 1, fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
@@ -204,5 +227,5 @@ const styles = StyleSheet.create({
 	chip: { height: 22, paddingHorizontal: 8, borderRadius: 6, justifyContent: 'center' },
 	chipText: { fontSize: 11, fontWeight: '800' },
 	more: { width: 32, height: 36, marginRight: -8, alignItems: 'center', justifyContent: 'center' },
-	note: { marginLeft: 68, fontSize: 12, lineHeight: 16, fontWeight: '700' },
+	note: { fontSize: 12, lineHeight: 16, fontWeight: '700' },
 })
