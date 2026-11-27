@@ -660,7 +660,6 @@ export default function TrackAppointmentPage() {
 							canCancel: focusedVisit.can_cancel !== false,
 							lockedNote: lockedReason(
 								focusedVisit.status,
-								!!shownProvider,
 								scheduledNoun,
 								visitPolicy.cancel_cutoff_minutes
 							),

@@ -1067,11 +1067,17 @@ export const acceptCareRequestBackend = async (
 		}
 	} catch (error: any) {
 		const detail = error.response?.data?.detail
-		// NURSE_BUSY: she holds a visit too close to this one. Not "someone else took it": say what the server says.
-		if (detail?.code === 'NURSE_BUSY') {
+		// NURSE_BUSY (she holds a visit too close to this one) and NURSE_OFFLINE (she is not online) are not "someone else took it": say
+		// what the server says and leave the offer where it is.
+		if (detail?.code === 'NURSE_BUSY' || detail?.code === 'NURSE_OFFLINE') {
 			return {
 				success: false,
-				message: typeof detail.message === 'string' ? detail.message : 'You already have a visit at that time.',
+				message:
+					typeof detail.message === 'string'
+						? detail.message
+						: detail.code === 'NURSE_OFFLINE'
+							? 'Go online to take this request.'
+							: 'You already have a visit at that time.',
 			}
 		}
 		if (error.response?.status === 409 || simulateClaimed) {

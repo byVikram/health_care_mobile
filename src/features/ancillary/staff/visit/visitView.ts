@@ -1,7 +1,7 @@
 // src/features/ancillary/staff/visit/visitView.ts
 //
 // Display helpers for the provider visit screens (details, in progress, complete).
-import { isSameDay, parseDateOnly } from '../../../../utils/date'
+import { clinicTodayIso } from '../../../doctor/scheduleUtils'
 import { capitaliseWords, formatTimeSlot } from '../../../../utils/formatters'
 import type { ProviderVisitDetail, ProviderVisitRecord } from '../../providerVisitService'
 import type { ProviderNoun } from '../providerSpecialityCopy'
@@ -17,8 +17,7 @@ export const isUnassigned = (v: Pick<ProviderVisitDetail, 'status'>) => v.status
 /** Due today. An instant ("Book now") visit has no date -- it is for right now -- so it always counts as today. */
 export const isToday = (v: Pick<ProviderVisitDetail, 'date'>) => {
 	if (!v.date) return true
-	const d = parseDateOnly(v.date)
-	return !!d && isSameDay(d, new Date())
+	return v.date === clinicTodayIso()
 }
 
 /** "7:00 PM – 7:45 PM"; an instant visit has no slot, so it reads "Instant · now". */

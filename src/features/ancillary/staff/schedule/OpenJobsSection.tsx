@@ -1,7 +1,8 @@
 // src/features/ancillary/staff/schedule/OpenJobsSection.tsx
 //
 // The two "no nurse has this yet" cards of the ancillary schedule design:
-//   - NEEDED NOW: instant requests and unfilled visits (Take),
+//   - NEEDED NOW: instant requests and unfilled visits (Take: the caller asks her to confirm first; an instant request cannot be taken
+//     while she is offline),
 //   - OPEN NEAR YOU: bookings nearby for the picked day (Pick up, opens the booking to choose days).
 // The jobs come from providerOpenJobsService (GET /provider/me/open-jobs), so the card does not
 // show until there is something to take.
@@ -19,13 +20,15 @@ type Props = {
 	jobs: OpenJob[]
 	/** The picked day, YYYY-MM-DD (which day of a multi-day booking this row is about). */
 	day: string
+	/** Whether she is online (the Today switch); null/undefined = not known. Offline, an instant request cannot be taken. */
+	online?: boolean | null
 	onPick: (job: OpenJob) => void
 }
 
 const firstTime = (job: OpenJob, day: string) =>
 	job.days.find((d) => d.date === day)?.startTime ?? job.days[0]?.startTime ?? ''
 
-export function OpenJobsSection({ kind, jobs, day, onPick }: Props) {
+export function OpenJobsSection({ kind, jobs, day, online, onPick }: Props) {
 	if (jobs.length === 0) return null
 	const needed = kind === 'needed'
 	return (
@@ -43,14 +46,18 @@ export function OpenJobsSection({ kind, jobs, day, onPick }: Props) {
 		>
 			{jobs.map((job) => {
 				const instant = job.kind === 'instant'
+				// Offline she is offered no instant request: say so instead of letting the server refuse (409 NURSE_OFFLINE).
+				const blocked = needed && instant && online === false
 				const start = firstTime(job, day)
 				const idx = job.days.findIndex((d) => d.date === day)
 				const clash = job.days[idx]?.clash
-				const note = needed
-					? instant
-						? `Waiting ${job.waiting ?? '1 min'} · arrive by ${timeParts(start).time} ${timeParts(start).ampm}`
-						: `Scheduled for ${timeParts(start).time} ${timeParts(start).ampm} · still unfilled`
-					: `${job.days.length > 1 ? `Day ${idx + 1} of ${job.days.length}-day booking` : 'Single visit'}${clash ? ` · ${clash}` : ''}`
+				const note = blocked
+					? 'You’re offline · go online on Today to take instant requests'
+					: needed
+						? instant
+							? `Waiting ${job.waiting ?? '1 min'} · arrive by ${timeParts(start).time} ${timeParts(start).ampm}`
+							: `Scheduled for ${timeParts(start).time} ${timeParts(start).ampm} · still unfilled`
+						: `${job.days.length > 1 ? `Day ${idx + 1} of ${job.days.length}-day booking` : 'Single visit'}${clash ? ` · ${clash}` : ''}`
 				const careName = job.services[0]?.name ?? 'Care visit'
 				const care = job.services.length > 1 ? `${careName} + ${job.services.length - 1} more` : careName
 				return (
@@ -68,9 +75,11 @@ export function OpenJobsSection({ kind, jobs, day, onPick }: Props) {
 							</View>
 							<TouchableOpacity
 								onPress={() => onPick(job)}
+								disabled={blocked}
 								activeOpacity={0.8}
-								style={styles.action}
+								style={[styles.action, blocked && styles.actionOff]}
 								accessibilityRole="button"
+								accessibilityState={{ disabled: blocked }}
 								accessibilityLabel={`${needed ? 'Take' : 'Pick up'} · ${job.patientName}`}
 							>
 								<View style={styles.actionCircle}>
@@ -105,6 +114,7 @@ const styles = StyleSheet.create({
 	mid: { flex: 1, minWidth: 0, gap: 2 },
 	name: { fontSize: 15, lineHeight: 20, fontWeight: '700', color: APP_COLORS.ink },
 	action: { width: 56, alignItems: 'center', gap: 3 },
+	actionOff: { opacity: 0.4 },
 	actionCircle: {
 		width: 36,
 		height: 36,

@@ -83,7 +83,7 @@ export const assignLine = (v: AncillaryOrderVisit, noun: string, leadMinutes: nu
 		return `${v.provider?.name ?? capitalize(noun)} has arrived${until ? ` · waiting until ${until}` : ''}`
 	}
 	const who = v.provider?.name
-	if (who) return `${who} · ${noun}`
+	if (who) return `${who} · ${lateNote(v) ?? noun}`
 	if (isDoneStatus(v.status)) return 'Visit completed'
 	if (v.status === 'SEARCHING') return `Finding your ${noun}…`
 	return `${capitalize(noun)} assigned at ${assignedAtLabel(v.date, v.start_time, leadMinutes)}`
@@ -93,11 +93,20 @@ export const assignLine = (v: AncillaryOrderVisit, noun: string, leadMinutes: nu
 export const visitTitle = (v: AncillaryOrderVisit, index: number) =>
 	`Visit ${v.index ?? index + 1} · ${dayLabel(v.date)}`
 
-/** Why a visit can't be cancelled (or moved) from the app any more. */
-export const lockedReason = (status: string, hasProvider: boolean, noun: string, cancelCutoffMinutes: number) => {
+/**
+ * Why a visit can't be cancelled from the app (the server decides: `can_cancel`). A day a provider has already accepted CAN be
+ * cancelled, up to the cutoff, so being assigned is no reason: only a visit already under way, or too close to its start, is locked.
+ */
+export const lockedReason = (status: string, noun: string, cancelCutoffMinutes: number) => {
 	if (status === 'UNASSIGNED') return `No ${noun} was available for this visit`
-	if (hasProvider || /ASSIGNED|ACCEPTED|EN_ROUTE|ARRIVED|IN_PROGRESS/.test(status))
-		return `${capitalize(noun)} already assigned`
+	if (/EN_ROUTE|ARRIVED|IN_PROGRESS/.test(status)) return `${capitalize(noun)} is already on the way`
 	if (status === 'SEARCHING') return `Finding your ${noun} now`
 	return `Too close to start · cancel up to ${leadText(cancelCutoffMinutes)} before`
+}
+
+/** "about 20 min late": the minutes the provider told the patient she is running late (null when she has not, or has arrived). */
+export const lateNote = (v: AncillaryOrderVisit): string | null => {
+	const minutes = v.running_late_minutes ?? v.runningLateMinutes ?? 0
+	if (minutes <= 0 || v.status === 'ARRIVED' || isLiveStatus(v.status) || isDoneStatus(v.status)) return null
+	return `about ${minutes} min late`
 }

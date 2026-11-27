@@ -6,6 +6,7 @@
 import type { AppTagTone } from '../../../components/common'
 import { combineDateTime, parseDateOnly, relativeDayLabel, fullDayLabel } from '../../../utils/date'
 import { formatTimeSlot } from '../../../utils/formatters'
+import { clinicTodayIso } from '../../doctor/scheduleUtils'
 import {
 	PAY_AFTER_VISIT,
 	type AncillaryOrderStatus,
@@ -120,7 +121,7 @@ export const normalizeProviderOrder = (raw: RawProviderOrder): ProviderOrderView
 			? `Booked ${bookedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
 			: 'Booked just now'
 
-	const today = new Date()
+	const today = clinicTodayIso()
 	const visits: ProviderOrderVisitView[] = [...rawVisits]
 		.sort((a, b) => a.index - b.index)
 		.map((v) => {
@@ -136,16 +137,11 @@ export const normalizeProviderOrder = (raw: RawProviderOrder): ProviderOrderView
 					isToday: true,
 				}
 			}
-			const d = parseDateOnly(v.date)
 			return {
 				...v,
 				title: visitTitle(v.date),
 				sub: visitSub(v.startTime, v.endTime),
-				isToday:
-					!!d &&
-					d.getFullYear() === today.getFullYear() &&
-					d.getMonth() === today.getMonth() &&
-					d.getDate() === today.getDate(),
+				isToday: v.date === today,
 			}
 		})
 

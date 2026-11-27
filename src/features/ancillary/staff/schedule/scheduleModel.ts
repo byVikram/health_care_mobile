@@ -6,6 +6,7 @@
 import { APP_COLORS } from '../../../../config/theme'
 import { DOW_LABELS, MONTH_SHORT, formatDateForApi, parseDateOnly } from '../../../../utils/date'
 import { formatTimeSlot } from '../../../../utils/formatters'
+import { clinicDateIso, clinicTodayIso } from '../../../doctor/scheduleUtils'
 import type { ProviderOrderView } from '../providerOrderView'
 
 export type VisitKind = 'instant' | 'scheduled'
@@ -71,7 +72,8 @@ export const shortArea = (street?: string | null) => (street ?? '').split(',')[0
 
 export const isoOf = (d: Date) => formatDateForApi(d)
 
-export const todayIso = () => isoOf(new Date())
+/** Today's date at the clinic (Mumbai), whatever time zone the phone is set to: the zone the server counts a visit's day in. */
+export const todayIso = () => clinicTodayIso()
 
 export const addDaysIso = (iso: string, days: number) => {
 	const d = parseDateOnly(iso) ?? new Date()
@@ -134,7 +136,7 @@ export const toScheduleVisits = (orders: ProviderOrderView[], today: string): Sc
 			if (!state) continue
 			// An instant visit has no slot: it is today while it is open, and the day she took it once it has ended.
 			const took = v.acceptedAt ? new Date(v.acceptedAt) : null
-			const endedOn = state !== 'active' && took && !Number.isNaN(took.getTime()) ? isoOf(took) : today
+			const endedOn = state !== 'active' && took && !Number.isNaN(took.getTime()) ? clinicDateIso(took) : today
 			out.push({
 				key: `${order.id}:${v.key}`,
 				orderId: order.id,

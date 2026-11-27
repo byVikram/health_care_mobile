@@ -48,6 +48,10 @@ export function openNotificationTarget(navigate: NavigateFn, target: Notificatio
 	} else if (type === 'provider_today') {
 		// A home-care provider's Today screen (a patient cancelled a visit they had accepted): the Home tab of their tab bar.
 		navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.HOME })
+	} else if (type === 'provider_schedule') {
+		// A home-care provider's Schedule tab ("New visits near you": open jobs listed for her): the PORTAL route of their tab bar
+		// (MainTabNavigator's TAB_TARGETS maps the `provider_schedule` tab key to it).
+		navigate(ROUTES.MAIN.TABS, { screen: ROUTES.MAIN.PORTAL })
 	} else {
 		return false
 	}

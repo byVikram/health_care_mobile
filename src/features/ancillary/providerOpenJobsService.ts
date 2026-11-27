@@ -45,8 +45,6 @@ export type OpenJob = {
 	bookedBy: string | null
 	/** "Posted 2 h ago" */
 	postedAgo: string | null
-	/** What "respond by" means is the team's call (PB-11): the backend sends null until then. */
-	respondBy: string | null
 	/** Instant only: how long the patient has waited ("6 min"). */
 	waiting: string | null
 	/** The nurse's payout for one visit (provider_service.provider_payout). */
@@ -64,11 +62,15 @@ export type AcceptedOpenJob = { acceptedDates: string[]; openDates: string[] }
 
 export type ReleaseScope = 'DAY' | 'REMAINING'
 
+/** What a release answers: `late` = it was given back less than 12 hours before the visit (allowed, but recorded and counted). */
+export type ReleaseResult = { late: boolean }
+
 /** The codes the open-jobs routes refuse with. */
 export type OpenJobErrorCode =
 	| 'ALREADY_TAKEN'
 	| 'DAY_NOT_OPEN'
 	| 'NURSE_BUSY'
+	| 'NURSE_OFFLINE'
 	| 'RELEASE_NOT_SUPPORTED'
 	| 'VISIT_NOT_RELEASABLE'
 	| 'OFFER_EXPIRED'
@@ -117,16 +119,22 @@ export const hideOpenJob = async (jobId: string, reason: string): Promise<void> 
 
 /**
  * Give back ONE day (`DAY`) or that day and every later one she holds (`REMAINING`). The visit goes back out to the other nurses, never
- * to her. 409 RELEASE_NOT_SUPPORTED for an older order that was never sent out day by day (the caller then gives the whole order back
- * with providerVisitService.releaseOrder), 409 VISIT_NOT_RELEASABLE when it is not hers or has already started.
+ * to her. The reason (and note) are stored with the release: no separate issue is filed. 409 RELEASE_NOT_SUPPORTED for an older order that
+ * was never sent out day by day (the caller then gives the whole order back with providerVisitService.releaseOrder), 409
+ * VISIT_NOT_RELEASABLE when it is not hers or has already started. A release less than 12 hours ahead still goes through (`late`).
  */
 export const releaseVisitDay = async (
 	visitId: string,
 	scope: ReleaseScope,
 	reason: string,
 	note?: string
-): Promise<void> => {
+): Promise<ReleaseResult> => {
 	const body: Record<string, unknown> = { scope, reason }
 	if (note?.trim()) body.note = note.trim()
-	await ApiService.post(API_ENDPOINTS.ANCILLARY.PROVIDER_VISIT_RELEASE(visitId), body, { skipGlobalError: true })
+	const res = await ApiService.post<Envelope<{ late?: boolean } | null>>(
+		API_ENDPOINTS.ANCILLARY.PROVIDER_VISIT_RELEASE(visitId),
+		body,
+		{ skipGlobalError: true }
+	)
+	return { late: res.data?.data?.late === true }
 }

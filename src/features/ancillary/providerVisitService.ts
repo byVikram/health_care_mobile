@@ -159,8 +159,12 @@ export const toProviderOffer = (o: Record<string, any> | null | undefined): Prov
 // The dispatch socket only delivers offers to a provider who is verified AND online AND has a location, so going
 // online always sends the current position. These throw on failure (the ancillaryService variants swallow errors).
 
-export const getProviderOnlineStatus = async (): Promise<boolean> => {
-	const res = await ApiService.get<Envelope<{ isOnline?: boolean }>>(API_ENDPOINTS.ANCILLARY.PROVIDER_STATUS)
+/** `silent`: a failure is not shown as the app-wide error dialog (a background read the provider did not ask for). */
+export const getProviderOnlineStatus = async (opts?: { silent?: boolean }): Promise<boolean> => {
+	const res = await ApiService.get<Envelope<{ isOnline?: boolean }>>(
+		API_ENDPOINTS.ANCILLARY.PROVIDER_STATUS,
+		opts?.silent ? { skipGlobalError: true } : undefined
+	)
 	return !!res.data?.data?.isOnline
 }
 

@@ -2,7 +2,8 @@
 //
 // "Up next · N" of the provider Home (Ancillary Home design): a snapping row of visit cards, then a dashed "Full schedule" card
 // at the end, with a dot for the card on show. A card: a strip (INSTANT / SCHEDULED + when), the patient with a status chip, the
-// services, the address with the minutes away, a tag, and Call + Open visit (the first card is filled, the rest outlined).
+// services, the address with the minutes away, a tag, and Call + Open visit (the first card is filled, the rest outlined), and
+// "Running late?" under them for a visit due today that she has not reached yet (opens the shared RunningLateSheet).
 import React, { useState } from 'react'
 import {
 	Pressable,
@@ -16,6 +17,7 @@ import {
 } from 'react-native'
 import { AppPathIcon } from '../../../../components/common'
 import { APP_COLORS } from '../../../../config/theme'
+import { canReportRunningLate } from '../schedule/RunningLateSheet'
 import { PATHS } from '../schedule/scheduleTheme'
 import type { UpNextCard } from './upNextView'
 
@@ -26,10 +28,12 @@ type Props = {
 	cards: UpNextCard[]
 	onOpen: (card: UpNextCard) => void
 	onCall: (card: UpNextCard) => void
+	/** Tell the patient she is running late (the card shows the link only while the server would allow it). */
+	onRunningLate?: (card: UpNextCard) => void
 	onFullSchedule: () => void
 }
 
-export function UpNextCarousel({ cards, onOpen, onCall, onFullSchedule }: Props) {
+export function UpNextCarousel({ cards, onOpen, onCall, onRunningLate, onFullSchedule }: Props) {
 	const [active, setActive] = useState(0)
 
 	const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -141,6 +145,17 @@ export function UpNextCarousel({ cards, onOpen, onCall, onFullSchedule }: Props)
 									<Text style={[styles.ctaText, c.primary && styles.ctaTextPrimary]}>{c.cta}</Text>
 								</TouchableOpacity>
 							</View>
+							{!!onRunningLate && canReportRunningLate(c.visit.status, c.visit.date) && (
+								<TouchableOpacity
+									onPress={() => onRunningLate(c)}
+									activeOpacity={0.7}
+									accessibilityRole="button"
+									accessibilityLabel={`Running late for ${c.name}`}
+									style={styles.lateBtn}
+								>
+									<Text style={styles.lateText}>Running late?</Text>
+								</TouchableOpacity>
+							)}
 						</View>
 					</View>
 				))}
@@ -221,6 +236,8 @@ const styles = StyleSheet.create({
 	tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
 	tagText: { fontSize: 12, lineHeight: 18, fontWeight: '700' },
 	actions: { marginTop: 'auto', flexDirection: 'row', gap: 8 },
+	lateBtn: { minHeight: 36, alignItems: 'center', justifyContent: 'center' },
+	lateText: { fontSize: 13, fontWeight: '700', color: APP_COLORS.primary },
 	callBtn: {
 		width: 44,
 		height: 44,

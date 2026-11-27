@@ -154,7 +154,7 @@ export default function AncillaryScheduledDetailsPage() {
 		sub: `${timeLabel(v.start_time)}${v.visit_public_id === nextId ? ' · next visit' : ''}`,
 		fee: inr(perVisit),
 		canCancel: v.can_cancel !== false,
-		lockedNote: lockedReason(v.status, !!v.provider, noun, policy.cancel_cutoff_minutes),
+		lockedNote: lockedReason(v.status, noun, policy.cancel_cutoff_minutes),
 	}))
 
 	const patient = order?.patient
