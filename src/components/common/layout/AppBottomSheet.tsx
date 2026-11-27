@@ -57,11 +57,10 @@ export type AppBottomSheetProps = {
 	dismissible?: boolean
 	/** Hides the X in the header, for sheets that carry their own Done button. Defaults to true. */
 	showCloseButton?: boolean
-	/** The footer's height, to size the scrolling content above it. Defaults to 64 (one button); say more for a taller footer. */
-	footerHeight?: number
 	/**
-	 * Lazy loading: called when the content is scrolled near its bottom, and when it is too short to scroll at all (so a list that does not
-	 * fill the sheet keeps loading). It can fire repeatedly: the caller guards ("already loading", "nothing more").
+	 * Lazy loading: called once each time the content is scrolled to within a screenful of its bottom (again after it grows or after the
+	 * user scrolls away and back), and when it is too short to scroll at all, so a list that does not fill the sheet keeps loading. The
+	 * caller still guards ("already loading", "nothing more"): this only stops it being asked on every scroll event.
 	 */
 	onScrollNearEnd?: () => void
 }
@@ -71,6 +70,8 @@ const DISMISS_DRAG_DISTANCE = 40
 const DISMISS_DRAG_VELOCITY = 0.3
 // How close to the bottom (px) the content counts as "at the end" for `onScrollNearEnd`.
 const NEAR_END_DISTANCE = 240
+// The least height the footer is assumed to have when the sheet sizes the content above it (one button).
+const FOOTER_MIN_HEIGHT = 64
 // Vertical movement before a drag is recognised, so taps on buttons inside the sheet still work.
 const DRAG_START_THRESHOLD = 6
 const MAX_HEIGHT_RATIO = 0.8
@@ -100,7 +101,6 @@ export function AppBottomSheet({
 	appearance = 'default',
 	dismissible = true,
 	showCloseButton = true,
-	footerHeight: footerHeightProp = 64,
 	onScrollNearEnd,
 }: AppBottomSheetProps) {
 	const isModern = appearance === 'modern'
@@ -128,7 +128,9 @@ export function AppBottomSheet({
 			: height * maxHeightRatio
 
 	const headerAndHandleHeight = 74 + (subtitle ? 18 : 0)
-	const footerHeight = footer ? footerHeightProp : 0
+	// The footer's own height, measured (a banner or a second button makes it taller than one button), never less than one button.
+	const [footerContentHeight, setFooterContentHeight] = useState(0)
+	const footerHeight = footer ? Math.max(FOOTER_MIN_HEIGHT, footerContentHeight) : 0
 	const maxScrollHeight = Math.max(
 		120,
 		maxSheetHeight - headerAndHandleHeight - footerHeight - insets.bottom,
@@ -327,10 +329,18 @@ export function AppBottomSheet({
 	const [contentHeight, setContentHeight] = useState(0)
 	const contentScrollable = contentHeight > viewportHeight + 1
 
+	// True once `onScrollNearEnd` has been called for this stretch of scrolling: it is called again when the content grows or after the
+	// user has scrolled out of the end zone and back.
+	const nearEndSent = useRef(false)
+
 	const handleContentScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
 		scrollYRef.current = e.nativeEvent.contentOffset.y
+		if (!onScrollNearEnd) return
 		const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
-		if (onScrollNearEnd && contentSize.height - (contentOffset.y + layoutMeasurement.height) < NEAR_END_DISTANCE) {
+		const near = contentSize.height - (contentOffset.y + layoutMeasurement.height) < NEAR_END_DISTANCE
+		if (!near) nearEndSent.current = false
+		else if (!nearEndSent.current) {
+			nearEndSent.current = true
 			onScrollNearEnd()
 		}
 	}
@@ -545,6 +555,8 @@ export function AppBottomSheet({
 								onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
 								onContentSizeChange={(_, h) => {
 									setContentHeight(h)
+									// New content: the end is further away again, so the next approach asks for more.
+									nearEndSent.current = false
 									// Too short to scroll: the user can never reach the end, so ask for more now.
 									if (
 										onScrollNearEnd &&
@@ -595,7 +607,9 @@ export function AppBottomSheet({
 									{ paddingBottom: isModern ? 20 + insets.bottom : Math.max(insets.bottom, 12) },
 								]}
 							>
-								{footer}
+								<View onLayout={(e) => setFooterContentHeight(Math.ceil(e.nativeEvent.layout.height))}>
+									{footer}
+								</View>
 							</View>
 						)}
 					</View>

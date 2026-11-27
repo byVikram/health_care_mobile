@@ -3,8 +3,7 @@
 // "Reschedule appointment" / "Reschedule video call" sheet (design 7 / 7a):
 // current slot, 14-day date strip (the booking window), grouped time slots, and a
 // "Confirm · {day}, {time}" footer. Slots come from getDoctorAvailability
-// (normalised with RescheduleModal's normaliser); submit uses
-// rescheduleAppointment -- same payload as RescheduleModal. How it ends (spinner, inline error, success toast) is the shared
+// (normalised by availabilitySlots.ts); submit uses rescheduleAppointment. How it ends (spinner, inline error, success toast) is the shared
 // AppRescheduleSheet's: `onRescheduled` is its follow-up once the toast is up.
 
 import React, { useEffect, useMemo, useState } from 'react'
@@ -15,7 +14,7 @@ import {
 	AppRescheduleSheet,
 	DateStrip,
 	SlotChipGrid,
-	rescheduleErrorMessage,
+	sheetErrorMessage,
 	type AppRescheduleResult,
 	type SlotChipItem,
 } from '../../../../components/common'
@@ -28,7 +27,7 @@ import {
 	type TimeSlot,
 } from '../../../doctor/doctorService'
 import { APP_COLORS } from '../../../../config/theme'
-import { normalizeAvailabilitySlots } from '../RescheduleModal'
+import { normalizeAvailabilitySlots } from './availabilitySlots'
 import {
 	BOOKING_WINDOW_DAYS,
 	formatDateForApi,
@@ -98,7 +97,7 @@ export default function RescheduleSheet({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [visible])
 
-	// Video bookings may carry no hospital -- fall back to the doctor's first hospital (as RescheduleModal does).
+	// Video bookings may carry no hospital -- fall back to the doctor's first hospital.
 	useEffect(() => {
 		if (!visible) return
 		if (hospitalId) {
@@ -184,7 +183,7 @@ export default function RescheduleSheet({
 				? { ok: true }
 				: { ok: false, error: res?.message || 'Reschedule failed. Please try again.' }
 		} catch (error) {
-			return { ok: false, error: rescheduleErrorMessage(error, 'Reschedule failed. Please try again.') }
+			return { ok: false, error: sheetErrorMessage(error, 'Reschedule failed. Please try again.') }
 		}
 	}
 

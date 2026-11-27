@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react'
 import ApiService from '../../../../services/apiService'
 import { API_ENDPOINTS } from '../../../../constants/apiUrls'
 import { updateAppointmentsStatus } from '../../../../services/appointmentService'
-import { AppCancelSheet, cancelErrorMessage, type AppCancelResult } from '../../../../components/common'
+import { AppCancelSheet, sheetErrorMessage, type AppCancelResult } from '../../../../components/common'
 
 const REASONS = ['Feeling better', 'Can’t make it', 'Booked by mistake', 'Seeing another doctor']
 
@@ -66,7 +66,7 @@ export default function CancelAppointmentSheet({
 				'[CancelAppointmentSheet] cancel error:',
 				(error as any)?.response?.data || (error as any)?.message || error
 			)
-			return { ok: false, error: cancelErrorMessage(error, 'Please try again.') }
+			return { ok: false, error: sheetErrorMessage(error, 'Please try again.') }
 		}
 	}
 

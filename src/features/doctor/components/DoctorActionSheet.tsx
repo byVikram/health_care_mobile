@@ -14,7 +14,7 @@
 // shows the spinner, then a success toast and `onDone` (close, refresh), or the message inline above the button (no status pop-up).
 // The confirm button is pinned under the scrolling content, so it stays in reach however far the doctor list was scrolled.
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import {
 	AppAvatar,
@@ -101,27 +101,28 @@ export function DoctorActionSheet({
 }: DoctorActionSheetProps) {
 	const [reasonId, setReasonId] = useState<string | null>(reasons?.[0]?.id ?? null)
 	const [note, setNote] = useState('')
-	const [speciality, setSpeciality] = useState('all')
 	const [pickedId, setPickedId] = useState<string | null>(null)
+	const [wasVisible, setWasVisible] = useState(visible)
 	const list = useReferDoctors(visible && pickDoctor)
 
-	// Every opening starts from a clean form.
-	useEffect(() => {
-		if (!visible) return
-		setReasonId(reasons?.[0]?.id ?? null)
-		setNote('')
-		setSpeciality('all')
-		setPickedId(null)
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- only an opening resets the form
-	}, [visible])
+	// Every opening starts from a clean form: reset while rendering (React's way of adjusting state when a prop changes), not in an
+	// effect. The doctor list resets its own search and speciality.
+	if (visible !== wasVisible) {
+		setWasVisible(visible)
+		if (visible) {
+			setReasonId(reasons?.[0]?.id ?? null)
+			setNote('')
+			setPickedId(null)
+		}
+	}
 
-	const specialities = useMemo(
-		() => Array.from(new Set(list.doctors.map((d) => d.specialities[0]).filter(Boolean))),
-		[list.doctors]
-	)
-	const shown = list.doctors.filter((d) => speciality === 'all' || d.specialities[0] === speciality)
+	// The server already narrowed the list to the picked speciality.
+	const shown = list.doctors
 	const picked = list.doctors.find((d) => d.id === pickedId) ?? null
 
+	// The failed bookmark and the failed confirm both show in the pinned footer, which stays in view however far the list is scrolled.
+	// A confirm error wins: it is the one the doctor just caused.
+	const favouriteError = pickDoctor ? list.favouriteError : null
 	const { busy, error, confirm } = useSheetOutcome({
 		visible,
 		run: () =>
@@ -134,6 +135,7 @@ export function DoctorActionSheet({
 		successTitle: typeof successTitle === 'function' ? successTitle(picked) : successTitle,
 		onDone: () => (onDone ? onDone() : onClose()),
 	})
+	const footerError = error ?? favouriteError
 
 	// Nothing to confirm until a reason (or a doctor) is picked.
 	const blocked = pickDoctor ? !picked : !!reasons && !reasonId
@@ -148,11 +150,9 @@ export function DoctorActionSheet({
 			appearance="modern"
 			dismissible={!busy}
 			onScrollNearEnd={pickDoctor ? list.loadMore : undefined}
-			// The footer is taller with the second button: the content above is sized for it.
-			footerHeight={keepLabel ? 128 : 64}
 			footer={
 				<View style={styles.footer}>
-					{error ? <SheetNote tone="danger" text={error} /> : null}
+					{footerError ? <SheetNote tone="danger" text={footerError} /> : null}
 					<AppButton
 						size="lg"
 						loading={busy}
@@ -192,20 +192,27 @@ export function DoctorActionSheet({
 				{pickDoctor && (
 					<>
 						<AppSearchBar context="doctors" value={list.query} onChangeText={list.setQuery} />
-						{specialities.length > 1 && (
+						{list.specialities.length > 0 && (
 							<ScrollView
 								horizontal
 								showsHorizontalScrollIndicator={false}
 								contentContainerStyle={{ gap: 8 }}
 							>
-								{['all', ...specialities].map((sp) => (
+								<AppChip
+									label="All"
+									shape="pill"
+									size="md"
+									selected={list.specialityId === ''}
+									onPress={() => list.setSpecialityId('')}
+								/>
+								{list.specialities.map((sp) => (
 									<AppChip
-										key={sp}
-										label={sp === 'all' ? 'All' : sp}
+										key={sp.id}
+										label={sp.label}
 										shape="pill"
 										size="md"
-										selected={sp === speciality}
-										onPress={() => setSpeciality(sp)}
+										selected={sp.id === list.specialityId}
+										onPress={() => list.setSpecialityId(sp.id)}
 									/>
 								))}
 							</ScrollView>

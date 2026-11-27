@@ -58,9 +58,6 @@ export type AppRescheduleSheetProps<T = unknown> = {
 	onClose: () => void
 }
 
-/** A readable message from a failed reschedule call (the server's `message`, a `detail` string or `detail.message`), else `fallback`. */
-export { sheetErrorMessage as rescheduleErrorMessage } from './useSheetOutcome'
-
 export function AppRescheduleSheet<T = unknown>({
 	visible,
 	title,
