@@ -234,6 +234,10 @@ export type AppStackParamList = {
 	[ROUTES.STACK.PATIENT_PAYMENT]: PatientPaymentParams | undefined
 	[ROUTES.STACK.PATIENT_QUESTIONS_LIST]: { openAskModal?: boolean } | undefined
 	[ROUTES.STACK.PATIENT_QUESTION_DETAIL]: { questionId?: string; question?: any } | undefined
+	[ROUTES.STACK.PATIENT_MY_QUESTIONS]: undefined
+	[ROUTES.STACK.PATIENT_MY_QUESTION_DETAIL]: { questionId: string; question?: any }
+	[ROUTES.STACK.DOCTOR_MY_ANSWERS]: undefined
+	[ROUTES.STACK.DOCTOR_MY_ANSWER_DETAIL]: { questionId: string; question?: any }
 	[ROUTES.STACK.RADIOLOGY_LIST]: { scanTypeId?: number; scanTypeName?: string } | undefined
 	[ROUTES.STACK.RADIOLOGY_ORDERS]: undefined
 	[ROUTES.STACK.RADIOLOGY_ORDER_DETAIL]: { publicId: string; booking?: any }

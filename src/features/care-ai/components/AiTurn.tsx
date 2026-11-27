@@ -1,17 +1,19 @@
 // src/features/care-ai/components/AiTurn.tsx
 //
 // One Care AI turn: the "Care AI" label, then whichever blocks the reply has, in the design's order -- text,
-// urgent card, consult card, chat summary, booking card, closing sentence, lab results, medicine, bullets,
-// caution, buttons, quick-reply chips, and the answer footer.
+// urgent card, consult card, the doctors Care AI found, chat summary, booking card, closing sentence, lab results,
+// medicine, bullets, caution, buttons, quick-reply chips, and the answer footer.
 
 import React from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import { APP_COLORS } from '../../../config/theme'
+import { APP_COLORS, BUBBLE_SHADOW } from '../../../config/theme'
+import { CARE_AI } from '../careAiTheme'
 import type { CareAiAssistantMessage, CareAiBook, CareAiLink } from '../careAiTypes'
 import { AnswerFooter } from './AnswerFooter'
 import { BookCard } from './BookCard'
 import { CareAiAvatar } from './CareAiAvatar'
 import { ConsultCard } from './ConsultCard'
+import { DoctorResultsCard } from './DoctorResultsCard'
 import { QuickReplies } from './QuickReplies'
 import { ReplyActions } from './ReplyActions'
 import { BulletsCard, MedCard, NoteCallout } from './ReplyBlocks'
@@ -21,17 +23,19 @@ import { UrgentCard } from './UrgentCard'
 
 type Props = {
 	turn: CareAiAssistantMessage
-	/** First name of whoever the chat is for ("For Vikram", "Saved to Vikram’s health records"). */
-	forName: string
+	/** First name of whoever the chat is for ("For Vikram", "Saved to Vikram’s health records"). Without it answers cannot be saved. */
+	forName?: string
 	onLink: (link: CareAiLink) => void
 	onChip: (turn: CareAiAssistantMessage, chip: string) => void
 	/** Books a slot from the in-chat booking card (resolve to confirm, throw to keep the picker open). */
 	onBook?: (book: CareAiBook, slot: string) => void | Promise<void>
 	/** The patient switched sharing the chat summary with the doctor on or off. */
 	onShareSummary?: (shared: boolean) => void
+	/** The patient rated this answer. */
+	onFeedback?: (turn: CareAiAssistantMessage, helpful: boolean) => void
 }
 
-export function AiTurn({ turn, forName, onLink, onChip, onBook, onShareSummary }: Props) {
+export function AiTurn({ turn, forName, onLink, onChip, onBook, onShareSummary, onFeedback }: Props) {
 	const { reply } = turn
 	const showChips = !!reply.chips?.length && !turn.picked
 
@@ -42,13 +46,20 @@ export function AiTurn({ turn, forName, onLink, onChip, onBook, onShareSummary }
 				<Text style={styles.labelText}>Care AI</Text>
 			</View>
 			<View style={styles.body}>
-				{reply.text ? <Text style={styles.text}>{reply.text}</Text> : null}
+				{reply.text ? (
+					<View style={styles.bubble}>
+						<Text style={styles.text}>{reply.text}</Text>
+					</View>
+				) : null}
 				{reply.urgent ? <UrgentCard title={reply.urgent.title} body={reply.urgent.body} /> : null}
 				{reply.consult ? (
 					<ConsultCard consult={reply.consult} onPress={() => onLink(reply.consult!.link)} />
 				) : null}
+				{reply.doctors?.length ? (
+					<DoctorResultsCard doctors={reply.doctors} onOpenDoctor={(id) => onLink({ to: 'doctor', id })} />
+				) : null}
 				{reply.summary ? (
-					<SummaryCard summary={reply.summary} forName={forName} onShareChange={onShareSummary} />
+					<SummaryCard summary={reply.summary} forName={forName ?? ''} onShareChange={onShareSummary} />
 				) : null}
 				{reply.book ? (
 					<BookCard
@@ -58,15 +69,28 @@ export function AiTurn({ turn, forName, onLink, onChip, onBook, onShareSummary }
 						onViewBooking={() => onLink({ to: 'appointments' })}
 					/>
 				) : null}
-				{reply.after ? <Text style={styles.text}>{reply.after}</Text> : null}
+				{reply.after ? (
+					<View style={styles.bubble}>
+						<Text style={styles.text}>{reply.after}</Text>
+					</View>
+				) : null}
 				{reply.results ? <ResultsCard results={reply.results} /> : null}
 				{reply.med ? <MedCard name={reply.med.name} sub={reply.med.sub} /> : null}
 				{reply.bullets ? <BulletsCard title={reply.bulletsTitle ?? ''} bullets={reply.bullets} /> : null}
+				{reply.moreLists?.map((list) => (
+					<BulletsCard key={list.title} title={list.title} bullets={list.bullets} />
+				))}
 				{reply.note ? <NoteCallout text={reply.note} /> : null}
 				{reply.actions?.length ? <ReplyActions actions={reply.actions} onLink={onLink} /> : null}
 				{showChips ? <QuickReplies chips={reply.chips!} onPick={(chip) => onChip(turn, chip)} /> : null}
 				{reply.source ? (
-					<AnswerFooter source={reply.source} why={reply.why} shareText={reply.text} savedFor={forName} />
+					<AnswerFooter
+						source={reply.source}
+						why={reply.why}
+						shareText={reply.text}
+						savedFor={forName}
+						onFeedback={turn.messageId && onFeedback ? (helpful) => onFeedback(turn, helpful) : undefined}
+					/>
 				) : null}
 			</View>
 		</View>
@@ -78,5 +102,19 @@ const styles = StyleSheet.create({
 	label: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 	labelText: { fontSize: 12, lineHeight: 16, fontWeight: '800', color: APP_COLORS.primary },
 	body: { gap: 10, paddingLeft: 30 },
+	// Care AI's message, the mirror of the patient's bubble (square top-left corner), lifted by a small shadow.
+	bubble: {
+		alignSelf: 'flex-start',
+		paddingVertical: 10,
+		paddingHorizontal: 14,
+		borderTopLeftRadius: 6,
+		borderTopRightRadius: 18,
+		borderBottomLeftRadius: 18,
+		borderBottomRightRadius: 18,
+		borderWidth: 1,
+		borderColor: CARE_AI.cardBorder,
+		backgroundColor: APP_COLORS.surface,
+		...BUBBLE_SHADOW,
+	},
 	text: { fontSize: 15, lineHeight: 23, color: APP_COLORS.ink },
 })

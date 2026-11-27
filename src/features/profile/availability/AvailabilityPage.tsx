@@ -2,7 +2,7 @@
 // (only the online switch on Today); their profile row opens TravelRadiusPage instead.
 //   Weekly hours  -- pick a day, turn it on, then add Morning / Afternoon / Evening time ranges; "Copy to
 //                    all weekdays"; slot length. Saved with the footer button.
-//   Date overrides -- leave / unavailable, or different hours for one date. Each save / delete is immediate.
+//   Special days -- leave / unavailable, a break, or different hours for one date. Each save / delete is immediate.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -36,6 +36,7 @@ import {
 	daySummary,
 	emptyDay,
 	isDayOn,
+	parseIsoDate,
 	toIsoDate,
 	weekHasErrors,
 	type DateOverride,
@@ -86,6 +87,8 @@ function DoctorAvailabilityPage() {
 	const [mode, setMode] = useState<DoctorMode>('clinic')
 	const [tab, setTab] = useState<'week' | 'dates'>('week')
 	const [day, setDay] = useState(1)
+	// "Same hours Mon–Fri": while on, an edit to any weekday is applied to all five weekdays
+	const [sameHours, setSameHours] = useState(false)
 	const [pickerOpen, setPickerOpen] = useState(false)
 
 	const [doctorRows, setDoctorRows] = useState<DoctorOverrideRow[]>([])
@@ -178,19 +181,26 @@ function DoctorAvailabilityPage() {
 				: cur
 		)
 
-	const toggleDay = (on: boolean) => {
+	/** Put `value` on day `d`; with "Same hours Mon–Fri" on, a weekday's value goes to every weekday. */
+	const setDayValue = (d: number, value: WeekSections[number]) => {
 		if (!week) return
 		const next = cloneWeek(week)
-		next[day] = on ? { ...emptyDay(), morning: [SECTION_DEFAULT_RANGE.morning] } : emptyDay()
+		const targets = sameHours && WEEKDAYS.includes(d) ? WEEKDAYS : [d]
+		for (const t of targets) next[t] = JSON.parse(JSON.stringify(value))
 		setWeek(next)
 	}
 
-	const copyToWeekdays = () => {
-		if (!week) return
+	const toggleDay = (on: boolean) =>
+		setDayValue(day, on ? { ...emptyDay(), morning: [SECTION_DEFAULT_RANGE.morning] } : emptyDay())
+
+	const toggleSameHours = (on: boolean) => {
+		setSameHours(on)
+		if (!on || !week) return
+		// Turning it on makes the selected weekday (Monday when a weekend day is open) the shared set of hours.
+		const source = WEEKDAYS.includes(day) ? day : 1
 		const next = cloneWeek(week)
-		for (const d of WEEKDAYS) next[d] = JSON.parse(JSON.stringify(week[day]))
+		for (const d of WEEKDAYS) next[d] = JSON.parse(JSON.stringify(week[source]))
 		setWeek(next)
-		Toast.show({ type: 'success', text1: `${DAY_FULL[day]}'s hours copied to Monday–Friday` })
 	}
 
 	// ── Date overrides (immediate) ───────────────────────────────────────────
@@ -221,9 +231,11 @@ function DoctorAvailabilityPage() {
 	const saveOverride = async (o: Pick<DateOverride, 'date' | 'off' | 'ranges' | 'note'>) => {
 		try {
 			if (sheet?.initial) await deleteRows(sheet.initial.ids)
-			await createDoctorOverride(doctorOverridePayload(placeId, mode, o))
+			await createDoctorOverride(
+				doctorOverridePayload(placeId, mode, o, week ? dayRanges(week[parseIsoDate(o.date).getDay()]) : [])
+			)
 			setSheet(null)
-			Toast.show({ type: 'success', text1: 'Date override saved' })
+			Toast.show({ type: 'success', text1: 'Special day saved' })
 		} catch (e) {
 			showStatusModal({
 				status: 'error',
@@ -240,7 +252,7 @@ function DoctorAvailabilityPage() {
 		if (!removing) return
 		try {
 			await deleteRows(removing.ids)
-			Toast.show({ type: 'success', text1: 'Date override removed' })
+			Toast.show({ type: 'success', text1: 'Special day removed' })
 		} catch (e) {
 			showStatusModal({
 				status: 'error',
@@ -300,12 +312,13 @@ function DoctorAvailabilityPage() {
 						offLabel={offLabel}
 						subtitle={`Only for ${placeName(placeId)} · ${mode === 'clinic' ? 'in clinic' : 'video'}`}
 						allowNote={false}
+						weeklyRanges={(iso) => (week ? dayRanges(week[parseIsoDate(iso).getDay()]) : [])}
 						onSave={saveOverride}
 					/>
 					<AppConfirmSheet
 						visible={!!removing}
 						onClose={() => setRemoving(null)}
-						title="Remove this date override?"
+						title="Remove this special day?"
 						message="Your weekly hours will apply on this date again."
 						confirmLabel="Remove"
 						onConfirm={removeOverride}
@@ -352,7 +365,7 @@ function DoctorAvailabilityPage() {
 							<AppSegmentedControl
 								options={[
 									{ value: 'week', label: 'Weekly hours' },
-									{ value: 'dates', label: 'Date overrides' },
+									{ value: 'dates', label: 'Special days' },
 								]}
 								value={tab}
 								onChange={setTab}
@@ -371,9 +384,8 @@ function DoctorAvailabilityPage() {
 									options={DOCTOR_SLOTS}
 									value={currentSlot}
 									onChange={setSlot}
-									copyLabel={`Copy ${DAY_FULL[day]}'s hours to all weekdays`}
-									onCopy={copyToWeekdays}
-									copyDisabled={!isDayOn(week[day])}
+									sameHours={sameHours}
+									onSameHoursChange={toggleSameHours}
 								/>
 								<DayStrip week={week} selected={day} onSelect={setDay} />
 								<View style={styles.dayHead}>
@@ -390,11 +402,7 @@ function DoctorAvailabilityPage() {
 								{isDayOn(week[day]) ? (
 									<DaySections
 										day={week[day]}
-										onChange={(next) => {
-											const w = cloneWeek(week)
-											w[day] = next
-											setWeek(w)
-										}}
+										onChange={(next) => setDayValue(day, next)}
 										others={othersFor(placeId, mode, day)}
 									/>
 								) : (
@@ -405,8 +413,8 @@ function DoctorAvailabilityPage() {
 							</AppFormCard>
 						) : (
 							<AppFormCard
-								title="Date overrides"
-								helper="Holidays, half days or different hours at this clinic only."
+								title="Special days"
+								helper="Time off, a break, or different hours on one particular day at this clinic."
 							>
 								<OverrideList
 									overrides={overrides}
@@ -420,7 +428,7 @@ function DoctorAvailabilityPage() {
 									icon="calendar-plus"
 									onPress={() => setSheet({ initial: null })}
 								>
-									Add date override
+									Add a special day
 								</AppButton>
 							</AppFormCard>
 						)}

@@ -4,7 +4,7 @@
 // confirm dialog with a toast and an error pop-up). Cancels the whole booking (POST .../cancel); the sheet says "Booking cancelled" in a
 // toast and `onCancelled` refreshes the list, or shows the server's reason inline when it refuses.
 import React from 'react'
-import { AppCancelSheet, cancelErrorMessage, type AppCancelResult } from '../../components/common'
+import { AppCancelSheet, sheetErrorMessage, type AppCancelResult } from '../../components/common'
 import { cancelAncillaryOrder } from '../ancillary/ancillaryProviderBookingService'
 
 type Props = {
@@ -24,7 +24,7 @@ export default function CancelCareBookingSheet({ visible, orderId, title, line, 
 			await cancelAncillaryOrder(orderId)
 			return { ok: true }
 		} catch (e) {
-			return { ok: false, error: cancelErrorMessage(e, 'Please try again.') }
+			return { ok: false, error: sheetErrorMessage(e, 'Please try again.') }
 		}
 	}
 
