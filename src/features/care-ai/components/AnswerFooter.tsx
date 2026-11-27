@@ -1,7 +1,7 @@
 // src/features/care-ai/components/AnswerFooter.tsx
 //
 // What sits under an answer that has a source: "Why this answer?" (the records it drew on), thumbs up / down,
-// share, and "save to health records".
+// share, and "save to health records" (only where the screen can file it).
 
 import React, { useState } from 'react'
 import { Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
@@ -18,13 +18,15 @@ type Props = {
 	why?: string[]
 	/** Text handed to the share sheet. */
 	shareText?: string
-	/** Whose health records "Save" files the answer under. */
-	savedFor: string
+	/** Whose health records "Save" files the answer under. Without it there is no Save button. */
+	savedFor?: string
+	/** The patient rated the answer (called when a rating is set, not when it is taken back). */
+	onFeedback?: (helpful: boolean) => void
 }
 
 const MUTED = CARE_AI.caption
 
-export function AnswerFooter({ source, why, shareText, savedFor }: Props) {
+export function AnswerFooter({ source, why, shareText, savedFor, onFeedback }: Props) {
 	const [whyOpen, setWhyOpen] = useState(false)
 	const [feedback, setFeedback] = useState<Feedback>(null)
 	// Who the answer was filed under when it was saved; later switching "Asking for" must not rename it.
@@ -32,7 +34,11 @@ export function AnswerFooter({ source, why, shareText, savedFor }: Props) {
 	const saved = savedUnder !== null
 	const reasons = why?.length ? why : [source]
 
-	const toggleFeedback = (value: 'up' | 'down') => setFeedback((prev) => (prev === value ? null : value))
+	const toggleFeedback = (value: 'up' | 'down') => {
+		const next = feedback === value ? null : value
+		setFeedback(next)
+		if (next) onFeedback?.(next === 'up')
+	}
 
 	return (
 		<View style={styles.wrap}>
@@ -94,21 +100,23 @@ export function AnswerFooter({ source, why, shareText, savedFor }: Props) {
 				>
 					<AppPathIcon d={CARE_AI_ICONS.share} size={16} strokeWidth={2} color={MUTED} />
 				</AppIconButton>
-				<AppIconButton
-					circle
-					size={36}
-					variant="ghost"
-					accessibilityLabel="Save to my health records"
-					backgroundColor={saved ? APP_COLORS.successBg : 'transparent'}
-					onPress={() => setSavedUnder((current) => (current === null ? savedFor : null))}
-				>
-					<AppPathIcon
-						d={CARE_AI_ICONS.bookmark}
-						size={16}
-						strokeWidth={2}
-						color={saved ? APP_COLORS.success : MUTED}
-					/>
-				</AppIconButton>
+				{savedFor ? (
+					<AppIconButton
+						circle
+						size={36}
+						variant="ghost"
+						accessibilityLabel="Save to my health records"
+						backgroundColor={saved ? APP_COLORS.successBg : 'transparent'}
+						onPress={() => setSavedUnder((current) => (current === null ? savedFor : null))}
+					>
+						<AppPathIcon
+							d={CARE_AI_ICONS.bookmark}
+							size={16}
+							strokeWidth={2}
+							color={saved ? APP_COLORS.success : MUTED}
+						/>
+					</AppIconButton>
+				) : null}
 			</View>
 
 			{whyOpen ? (

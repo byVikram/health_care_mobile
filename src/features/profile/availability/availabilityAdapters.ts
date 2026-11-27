@@ -13,6 +13,7 @@ import {
 	sectionForStart,
 	toDaySections,
 	toHHMM,
+	subtractBreak,
 	toMinutes,
 	type DateOverride,
 	type TimeRange,
@@ -112,15 +113,20 @@ export const groupDoctorOverrides = (
 	hospitalPublicId: string,
 	mode: DoctorMode
 ): DateOverride[] => {
+	// A date's rows: blocked windows (what the open ranges are worked out from) and extra-hours rows (open time added
+	// outside the weekly hours; they only need to be removed with the date).
 	const byDate = new Map<string, DoctorOverrideRow[]>()
 	for (const r of rows) {
-		if (!r.is_blocked || r.hospital_public_id !== hospitalPublicId || r.appointment_mode !== apiMode(mode)) continue
+		if (r.hospital_public_id !== hospitalPublicId || r.appointment_mode !== apiMode(mode)) continue
 		byDate.set(r.date, [...(byDate.get(r.date) ?? []), r])
 	}
 	return [...byDate.entries()]
 		.sort(([a], [b]) => a.localeCompare(b))
+		.filter(([, list]) => list.some((r) => r.is_blocked))
 		.map(([date, list]) => {
-			const blocks = list.map((r) => ({ start: r.start_time.slice(0, 5), end: r.end_time.slice(0, 5) }))
+			const blocks = list
+				.filter((r) => r.is_blocked)
+				.map((r) => ({ start: r.start_time.slice(0, 5), end: r.end_time.slice(0, 5) }))
 			const open = openFromBlocks(blocks)
 			return {
 				ids: list.map((r) => r.id),
@@ -132,19 +138,32 @@ export const groupDoctorOverrides = (
 		})
 }
 
+/** The part of `ranges` that lies outside the weekly hours: needs its own rows, since slots are cut from weekly hours. */
+const extraHours = (ranges: TimeRange[], weekly: TimeRange[]): TimeRange[] =>
+	weekly.reduce((left, w) => subtractBreak(left, toMinutes(w.start), toMinutes(w.end)), ranges)
+
 export const doctorOverridePayload = (
 	hospitalPublicId: string,
 	mode: DoctorMode,
-	override: Pick<DateOverride, 'date' | 'off' | 'ranges'>
+	override: Pick<DateOverride, 'date' | 'off' | 'ranges'>,
+	/** The weekly ranges of that date: time outside them is sent as extra hours (the backend only generates slots inside them). */
+	weekly: TimeRange[] = []
 ) => ({
 	hospital_id: hospitalPublicId,
 	appointment_mode: apiMode(mode),
 	date: override.date,
-	slots: (override.off ? [{ start: '00:00', end: DAY_END }] : blocksLeavingOpen(override.ranges)).map((b) => ({
-		start_time: b.start,
-		end_time: b.end,
-		is_blocked: true,
-	})),
+	slots: [
+		...(override.off ? [{ start: '00:00', end: DAY_END }] : blocksLeavingOpen(override.ranges)).map((b) => ({
+			start_time: b.start,
+			end_time: b.end,
+			is_blocked: true,
+		})),
+		...(override.off ? [] : extraHours(override.ranges, weekly)).map((r) => ({
+			start_time: r.start,
+			end_time: r.end,
+			is_blocked: false,
+		})),
+	],
 })
 
 /** Re-exported for screens that group ranges back into sections. */

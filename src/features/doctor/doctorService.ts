@@ -177,7 +177,10 @@ export interface RescheduleAppointmentPayload {
 // Patient / admin reschedule: always carries the new slot. A DOCTOR must not use this (the backend answers a
 // doctor's date/time/hospital with a 400) -- see askPatientToReschedule below.
 export const rescheduleAppointment = async (payload: RescheduleAppointmentPayload): Promise<AppointmentResponse> => {
-	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, payload)
+	// The reschedule sheet shows the failure inline, so no global error dialog on top of it.
+	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, payload, {
+		skipGlobalError: true,
+	})
 	return res.data
 }
 
@@ -188,10 +191,15 @@ export const RESCHEDULE_REASON_MAX_LENGTH = 500
 
 export const askPatientToReschedule = async (appointmentId: string, reason?: string): Promise<AppointmentResponse> => {
 	const trimmed = reason?.trim().slice(0, RESCHEDULE_REASON_MAX_LENGTH)
-	const res = await ApiService.post<AppointmentResponse>(API_ENDPOINTS.APPOINTMENTS.RESCHEDULE, {
-		appointment_id: appointmentId,
-		...(trimmed ? { reason: trimmed } : {}),
-	})
+	// The ask sheet shows the failure inline, so no global error dialog on top of it.
+	const res = await ApiService.post<AppointmentResponse>(
+		API_ENDPOINTS.APPOINTMENTS.RESCHEDULE,
+		{
+			appointment_id: appointmentId,
+			...(trimmed ? { reason: trimmed } : {}),
+		},
+		{ skipGlobalError: true }
+	)
 	return res.data
 }
 export interface StartConsultationResponse {
@@ -420,8 +428,16 @@ export const getFavouriteDoctors = async (): Promise<FavouritesResponse> => {
 	return res.data
 }
 
-export const toggleFavouriteDoctor = async (publicId: string): Promise<ToggleFavouriteResponse> => {
-	const res = await ApiService.post<ToggleFavouriteResponse>(API_ENDPOINTS.DOCTORS_FAVOURITES.TOGGLE(publicId), {})
+export const toggleFavouriteDoctor = async (
+	publicId: string,
+	/** `skipGlobalError`: for a sheet that shows the failure itself (no error dialog on top of it). */
+	options?: { skipGlobalError?: boolean }
+): Promise<ToggleFavouriteResponse> => {
+	const res = await ApiService.post<ToggleFavouriteResponse>(
+		API_ENDPOINTS.DOCTORS_FAVOURITES.TOGGLE(publicId),
+		{},
+		options?.skipGlobalError ? { skipGlobalError: true } : undefined
+	)
 	return res.data
 }
 

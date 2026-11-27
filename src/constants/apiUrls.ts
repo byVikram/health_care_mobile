@@ -311,6 +311,13 @@ export const API_ENDPOINTS = {
 			`${BASE_URL}/api/ancillary/patient/visits/${visitId}/no-show/reply`,
 		PATIENT_BOOKING_RESTRICTION: `${BASE_URL}/api/ancillary/patient/booking-restriction`,
 	},
+	// Care AI: the health-assistant chat (see features/care-ai)
+	CHATBOT: {
+		SESSIONS: `${BASE_URL}/api/chatbot/sessions`,
+		SESSION_DETAIL: (sessionId: string) => `${BASE_URL}/api/chatbot/sessions/${sessionId}`,
+		SEND_MESSAGE: (sessionId: string) => `${BASE_URL}/api/chatbot/sessions/${sessionId}/message`,
+		FEEDBACK: (messageId: string) => `${BASE_URL}/api/chatbot/messages/${messageId}/feedback`,
+	},
 	WALLET: {
 		GET: `${BASE_URL}/api/wallet`,
 		TRANSACTIONS: `${BASE_URL}/api/wallet/transactions`,

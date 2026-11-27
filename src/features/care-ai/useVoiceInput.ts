@@ -1,36 +1,20 @@
 // src/features/care-ai/useVoiceInput.ts
 //
-// Speak-to-type for the Care AI composer. The speech recogniser (expo-speech-recognition, the same module the
-// consultation notes use) is switched off for now: the mic shows "coming soon" and never enters the listening
-// state. To turn it back on, restore the commented block and delete the placeholder `start` / `stop` below.
+// Speak-to-type for the Care AI composer: the mic listens and what is said is added to the message box (the patient
+// reads it, then sends). It is the shared speech hook behind every search bar's mic (hooks/useVoiceSearch): it asks
+// for the microphone once, shows its own message when speech cannot be recognised, and needs a development / production
+// build (the native module is not in Expo Go).
 
-import { useCallback } from 'react'
-import { showComingSoon } from '../../utils/toast'
-// import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition'
+import { useVoiceSearch } from '../../hooks/useVoiceSearch'
 
-export function useVoiceInput(_onTranscript: (text: string) => void) {
-	// const [listening, setListening] = useState(false)
-	const listening = false
-
-	// useSpeechRecognitionEvent('result', (event) => {
-	// 	const transcript = event.results[0]?.transcript
-	// 	if (transcript) onTranscript(transcript)
-	// })
-	// useSpeechRecognitionEvent('end', () => setListening(false))
-	// useSpeechRecognitionEvent('error', () => setListening(false))
-
-	const start = useCallback(async () => {
-		// const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync()
-		// if (!permission.granted) return
-		// setListening(true)
-		// ExpoSpeechRecognitionModule.start({ lang: 'en-US', interimResults: true, continuous: false })
-		showComingSoon('Voice input is coming soon.')
-	}, [])
-
-	const stop = useCallback(() => {
-		// setListening(false)
-		// ExpoSpeechRecognitionModule.stop()
-	}, [])
-
-	return { listening, start, stop }
+export function useVoiceInput(onTranscript: (text: string) => void) {
+	const voice = useVoiceSearch({ enabled: true, onFinal: onTranscript })
+	return {
+		/** The mic is open (the composer shows "Listening…"). */
+		listening: voice.active,
+		/** What is being heard right now, before it is final. */
+		heard: voice.partial,
+		start: voice.start,
+		stop: voice.stop,
+	}
 }

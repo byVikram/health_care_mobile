@@ -292,8 +292,7 @@ export default function PatientAppointmentDetails({ appointmentId }: { appointme
 	const handleRescheduled = () => {
 		setReschedOpen(false)
 		setLocalRescheduled(true)
-		Toast.show({ type: 'success', text1: 'Appointment rescheduled' })
-		void load(true)
+		void load(true) // the success toast is the reschedule sheet's
 	}
 
 	// ── Render ───────────────────────────────────────────────────────────────

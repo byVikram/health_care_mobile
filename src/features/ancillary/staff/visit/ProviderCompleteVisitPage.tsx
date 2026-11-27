@@ -232,7 +232,6 @@ export default function ProviderCompleteVisitPage() {
 				) : (
 					<AppButton
 						size="lg"
-						icon={ready ? 'check' : undefined}
 						style={styles.flex}
 						onPress={() => void submit()}
 						loading={submitting}

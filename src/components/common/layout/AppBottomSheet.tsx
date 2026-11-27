@@ -57,11 +57,20 @@ export type AppBottomSheetProps = {
 	dismissible?: boolean
 	/** Hides the X in the header, for sheets that carry their own Done button. Defaults to true. */
 	showCloseButton?: boolean
+	/** The footer's height, to size the scrolling content above it. Defaults to 64 (one button); say more for a taller footer. */
+	footerHeight?: number
+	/**
+	 * Lazy loading: called when the content is scrolled near its bottom, and when it is too short to scroll at all (so a list that does not
+	 * fill the sheet keeps loading). It can fire repeatedly: the caller guards ("already loading", "nothing more").
+	 */
+	onScrollNearEnd?: () => void
 }
 
 // Releasing after dragging this far down (or flicking faster than this) closes the sheet.
 const DISMISS_DRAG_DISTANCE = 40
 const DISMISS_DRAG_VELOCITY = 0.3
+// How close to the bottom (px) the content counts as "at the end" for `onScrollNearEnd`.
+const NEAR_END_DISTANCE = 240
 // Vertical movement before a drag is recognised, so taps on buttons inside the sheet still work.
 const DRAG_START_THRESHOLD = 6
 const MAX_HEIGHT_RATIO = 0.8
@@ -91,6 +100,8 @@ export function AppBottomSheet({
 	appearance = 'default',
 	dismissible = true,
 	showCloseButton = true,
+	footerHeight: footerHeightProp = 64,
+	onScrollNearEnd,
 }: AppBottomSheetProps) {
 	const isModern = appearance === 'modern'
 	const insets = useSafeAreaInsets()
@@ -117,7 +128,7 @@ export function AppBottomSheet({
 			: height * maxHeightRatio
 
 	const headerAndHandleHeight = 74 + (subtitle ? 18 : 0)
-	const footerHeight = footer ? 64 : 0
+	const footerHeight = footer ? footerHeightProp : 0
 	const maxScrollHeight = Math.max(
 		120,
 		maxSheetHeight - headerAndHandleHeight - footerHeight - insets.bottom,
@@ -318,6 +329,10 @@ export function AppBottomSheet({
 
 	const handleContentScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
 		scrollYRef.current = e.nativeEvent.contentOffset.y
+		const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent
+		if (onScrollNearEnd && contentSize.height - (contentOffset.y + layoutMeasurement.height) < NEAR_END_DISTANCE) {
+			onScrollNearEnd()
+		}
 	}
 
 	// Scrollable content on iOS: a rubber-band pull past the top closes the sheet too.
@@ -528,7 +543,17 @@ export function AppBottomSheet({
 								onScroll={handleContentScroll}
 								onScrollEndDrag={handleScrollEndDrag}
 								onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
-								onContentSizeChange={(_, h) => setContentHeight(h)}
+								onContentSizeChange={(_, h) => {
+									setContentHeight(h)
+									// Too short to scroll: the user can never reach the end, so ask for more now.
+									if (
+										onScrollNearEnd &&
+										viewportHeight > 0 &&
+										h < viewportHeight + NEAR_END_DISTANCE
+									) {
+										onScrollNearEnd()
+									}
+								}}
 								scrollEnabled={contentScrollable}
 								bounces={contentScrollable}
 								alwaysBounceVertical={false}

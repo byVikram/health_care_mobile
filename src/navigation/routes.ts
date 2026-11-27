@@ -58,6 +58,10 @@ export const ROUTES = {
 
 		PATIENT_QUESTIONS_LIST: 'PatientQuestionsList',
 		PATIENT_QUESTION_DETAIL: 'PatientQuestionDetail',
+		PATIENT_MY_QUESTIONS: 'PatientMyQuestions',
+		PATIENT_MY_QUESTION_DETAIL: 'PatientMyQuestionDetail',
+		DOCTOR_MY_ANSWERS: 'DoctorMyAnswers',
+		DOCTOR_MY_ANSWER_DETAIL: 'DoctorMyAnswerDetail',
 
 		RADIOLOGY_LIST: 'RadiologySearchPage',
 		RADIOLOGY_ORDERS: 'OrderListRadiologyPage',

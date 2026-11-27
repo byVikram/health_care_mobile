@@ -83,6 +83,11 @@ const DOCS: Record<Tab, { title: string; intro: string; sections: { title: strin
 				title: 'Location',
 				summary: 'Used to find nearby care and to guide a provider to your address during a visit.',
 			},
+			{
+				title: 'Voice search',
+				summary:
+					'On our website, voice search uses your browser’s own speech service (for example Google or Apple), which receives the audio to turn it into text. We don’t receive or store the audio, only the text you search for.',
+			},
 			{ title: 'How long we keep it', summary: 'How long records are kept and how to ask for deletion.' },
 			{ title: 'Security', summary: 'How your data is protected in storage and in transit.' },
 			{

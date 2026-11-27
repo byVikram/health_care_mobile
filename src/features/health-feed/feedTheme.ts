@@ -75,6 +75,14 @@ export function toneForTopic(topic: string): FeedTone {
 	return FEED_TONES.grey
 }
 
+/** "Female, 52 yrs" from the stored gender + age ("52 Years", "52 yrs", "52"). */
+export const askerLine = (q: { gender?: string | null; age?: string | null }) => {
+	const age = String(q.age ?? '')
+		.replace(/\s*(yrs?|years?)$/i, '')
+		.trim()
+	return [q.gender, age && /^\d+$/.test(age) ? `${age} yrs` : age].filter(Boolean).join(', ')
+}
+
 /** The question `tag` column holds up to three comma-separated topics. */
 export const splitTags = (tag?: string | null) =>
 	(tag ?? '')

@@ -19,7 +19,7 @@ export function OverrideList({ overrides, offLabel, onEdit, onRemove }: Override
 		return (
 			<View style={styles.empty}>
 				<MaterialCommunityIcons name="calendar-check-outline" size={28} color={APP_COLORS.primary} />
-				<Text style={styles.emptyTitle}>No date overrides</Text>
+				<Text style={styles.emptyTitle}>No special days</Text>
 				<Text style={styles.emptyText}>Your weekly hours apply on every date.</Text>
 			</View>
 		)

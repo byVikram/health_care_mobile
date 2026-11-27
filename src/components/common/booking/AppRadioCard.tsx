@@ -38,6 +38,8 @@ export type AppRadioCardProps = {
 	leading?: React.ReactNode
 	/** Node between the text and the radio (e.g. <AppIconButton icon="directions" … />). */
 	trailing?: React.ReactNode
+	/** Leaves the radio out: the picked card is shown by its border and tint alone (a long list of people to choose from). */
+	hideRadio?: boolean
 	variant?: 'card' | 'row' | 'option'
 	/** Hides the bottom divider in 'row' variant (e.g. the last row). */
 	last?: boolean
@@ -57,6 +59,7 @@ export function AppRadioCard({
 	tone,
 	leading,
 	trailing,
+	hideRadio = false,
 	variant = 'card',
 	last = false,
 	disabled = false,
@@ -142,15 +145,17 @@ export function AppRadioCard({
 				</View>
 			</Pressable>
 			{trailing}
-			<Pressable
-				onPress={onPress}
-				disabled={disabled}
-				hitSlop={11}
-				importantForAccessibility="no-hide-descendants"
-				accessibilityElementsHidden
-			>
-				<AppRadio checked={selected} />
-			</Pressable>
+			{!hideRadio && (
+				<Pressable
+					onPress={onPress}
+					disabled={disabled}
+					hitSlop={11}
+					importantForAccessibility="no-hide-descendants"
+					accessibilityElementsHidden
+				>
+					<AppRadio checked={selected} />
+				</Pressable>
+			)}
 		</View>
 	)
 }

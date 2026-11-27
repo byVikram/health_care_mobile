@@ -1,12 +1,12 @@
 // src/features/care-ai/components/RecentChatsSheet.tsx
 //
-// "Recent chats" sheet: search, New chat, the chats grouped This week / Earlier (each with its tag, e.g.
-// "For Raghav"), and the privacy line. With no chats yet it shows the "No chats yet" empty state instead.
+// "Recent chats" sheet: search, New chat, the saved chats grouped This week / Earlier, and the privacy line. With no
+// chats yet it shows the "No chats yet" empty state instead.
 
 import React, { useMemo, useState } from 'react'
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import { AppBottomSheet, AppButton, AppIconTile, AppPathIcon, AppSearchBar, AppTag } from '../../../components/common'
-import { APP_COLORS, TONES } from '../../../config/theme'
+import { AppBottomSheet, AppButton, AppPathIcon, AppSearchBar } from '../../../components/common'
+import { APP_COLORS } from '../../../config/theme'
 import { RECENT_GROUPS } from '../careAiData'
 import { CARE_AI_ICONS } from '../careAiIcons'
 import { CARE_AI } from '../careAiTheme'
@@ -49,7 +49,12 @@ export function RecentChatsSheet({ visible, chats, onClose, onNewChat, onOpenCha
 			) : (
 				<View>
 					<View style={styles.tools}>
-						<AppSearchBar context="careAiChats" value={query} onChangeText={setQuery} style={styles.search} />
+						<AppSearchBar
+							context="careAiChats"
+							value={query}
+							onChangeText={setQuery}
+							style={styles.search}
+						/>
 						<TouchableOpacity onPress={onNewChat} accessibilityRole="button" style={styles.newChat}>
 							<AppPathIcon
 								d={CARE_AI_ICONS.plus}
@@ -66,20 +71,12 @@ export function RecentChatsSheet({ visible, chats, onClose, onNewChat, onOpenCha
 							<Text style={styles.group}>{group.toUpperCase()}</Text>
 							{items.map((chat, index) => (
 								<TouchableOpacity
-									key={chat.title}
+									key={chat.id}
 									onPress={() => onOpenChat(chat)}
 									activeOpacity={0.8}
 									accessibilityRole="button"
 									style={[styles.row, index < items.length - 1 && styles.rowDivider]}
 								>
-									<AppIconTile size={40} radius={12} tone={chat.tone}>
-										<AppPathIcon
-											d={chat.icon}
-											size={20}
-											strokeWidth={2}
-											color={TONES[chat.tone].ink}
-										/>
-									</AppIconTile>
 									<View style={styles.rowText}>
 										<View style={styles.rowTop}>
 											<Text style={styles.rowTitle} numberOfLines={1}>
@@ -90,15 +87,6 @@ export function RecentChatsSheet({ visible, chats, onClose, onNewChat, onOpenCha
 										<Text style={styles.rowPreview} numberOfLines={1}>
 											{chat.preview}
 										</Text>
-										{chat.tag ? (
-											<AppTag
-												label={chat.tag.label}
-												tone={chat.tag.tone}
-												size="sm"
-												uppercase={false}
-												style={styles.tag}
-											/>
-										) : null}
 									</View>
 								</TouchableOpacity>
 							))}
@@ -107,7 +95,7 @@ export function RecentChatsSheet({ visible, chats, onClose, onNewChat, onOpenCha
 
 					<View style={styles.privacy}>
 						<AppPathIcon d={CARE_AI_ICONS.shield} size={14} strokeWidth={2} color={APP_COLORS.inkMuted} />
-						<Text style={styles.privacyText}>Chats are private to you and are kept for 90 days.</Text>
+						<Text style={styles.privacyText}>Chats are private to you.</Text>
 					</View>
 				</View>
 			)}
@@ -147,7 +135,6 @@ const styles = StyleSheet.create({
 	rowTitle: { flex: 1, minWidth: 0, fontSize: 15, lineHeight: 20, fontWeight: '700', color: APP_COLORS.ink },
 	rowWhen: { fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
 	rowPreview: { fontSize: 13, lineHeight: 18, color: APP_COLORS.inkMuted },
-	tag: { alignSelf: 'flex-start', marginTop: 2 },
 	privacy: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
 	privacyText: { flex: 1, fontSize: 12, lineHeight: 17, color: APP_COLORS.inkMuted },
 	empty: { alignItems: 'center', gap: 8, paddingTop: 24, paddingHorizontal: 8 },

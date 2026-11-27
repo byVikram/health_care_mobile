@@ -191,8 +191,10 @@ export type {
 	AppCancelSheetProps,
 	AppCancelSummary,
 } from './booking/AppCancelSheet'
-export { AppRescheduleSheet, AppRescheduleGroup } from './booking/AppRescheduleSheet'
-export type { AppRescheduleSheetProps } from './booking/AppRescheduleSheet'
+export { AppRescheduleSheet, AppRescheduleGroup, rescheduleErrorMessage } from './booking/AppRescheduleSheet'
+export type { AppRescheduleSheetProps, AppRescheduleResult, AppRescheduleOk } from './booking/AppRescheduleSheet'
+export { useSheetOutcome, sheetErrorMessage } from './booking/useSheetOutcome'
+export type { SheetOk, SheetResult } from './booking/useSheetOutcome'
 export type { AppBookingSuccessProps } from './booking/AppBookingSuccess'
 export type { AppCatalogItemRowProps } from './booking/AppCatalogItemRow'
 export {

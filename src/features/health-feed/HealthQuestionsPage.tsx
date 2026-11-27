@@ -25,23 +25,17 @@ import type { AppStackParamList } from '../../navigation/types'
 import { listHealthQuestions, type PatientQuestion } from '../../services/qaService'
 import { AskQuestionSheet } from './AskQuestionSheet'
 import { FeedHeader } from './FeedHeader'
-import { FEED_ICONS, relativeTime, splitTags, toneForTopic } from './feedTheme'
+import { MyQuestionsLink } from './MyQuestionsLink'
+import { QuestionCard } from './QuestionCard'
+import { FEED_ICONS, askerLine, splitTags } from './feedTheme'
+
+export { askerLine }
 
 type Nav = NativeStackNavigationProp<AppStackParamList>
 type SortKey = 'new' | 'answers'
 
 const PAGE_SIZE = 50 // the API's maximum page size
 const MAX_PAGES = 4
-const GREEN = '#1E7A4E'
-const AMBER = '#8A5300'
-
-/** "Female, 52 yrs" from the stored gender + age ("52 Years", "52 yrs", "52"). */
-export const askerLine = (q: Pick<PatientQuestion, 'gender' | 'age'>) => {
-	const age = String(q.age ?? '')
-		.replace(/\s*(yrs?|years?)$/i, '')
-		.trim()
-	return [q.gender, age && /^\d+$/.test(age) ? `${age} yrs` : age].filter(Boolean).join(', ')
-}
 
 export default function HealthQuestionsPage() {
 	const navigation = useNavigation<Nav>()
@@ -133,6 +127,11 @@ export default function HealthQuestionsPage() {
 					showsVerticalScrollIndicator={false}
 					ListHeaderComponent={
 						<View>
+							<View style={styles.myQuestions}>
+								<MyQuestionsLink
+									onPress={() => navigation.navigate(ROUTES.STACK.PATIENT_MY_QUESTIONS)}
+								/>
+							</View>
 							<ScrollView
 								horizontal
 								showsHorizontalScrollIndicator={false}
@@ -210,45 +209,10 @@ export default function HealthQuestionsPage() {
 	)
 }
 
-function QuestionCard({ q, onPress }: { q: PatientQuestion; onPress: () => void }) {
-	const tags = splitTags(q.tag)
-	const first = tags[0]
-	const tone = toneForTopic(first ?? '')
-	const answers = q.answers.length
-	return (
-		<Pressable onPress={onPress} accessibilityRole="button" style={styles.card}>
-			<View style={styles.cardTop}>
-				{!!first && (
-					<View style={[styles.pill, { backgroundColor: tone.bg }]}>
-						<Text style={[styles.pillText, { color: tone.ink }]}>{first}</Text>
-					</View>
-				)}
-				<Text style={styles.cardMeta} numberOfLines={1}>
-					{[askerLine(q), relativeTime(q.created_at)].filter(Boolean).join(' · ')}
-				</Text>
-			</View>
-			<Text style={styles.cardTitle}>{q.question}</Text>
-			<Text style={styles.cardBody} numberOfLines={2}>
-				{q.short_description || q.full_description}
-			</Text>
-			<View style={styles.status}>
-				<AppPathIcon
-					d={answers ? FEED_ICONS.check : FEED_ICONS.clock}
-					size={14}
-					strokeWidth={2.4}
-					color={answers ? GREEN : AMBER}
-				/>
-				<Text style={[styles.statusText, { color: answers ? GREEN : AMBER }]}>
-					{answers ? `${answers} ${answers === 1 ? 'doctor' : 'doctors'} answered` : 'Waiting for an answer'}
-				</Text>
-			</View>
-		</Pressable>
-	)
-}
-
 const styles = StyleSheet.create({
 	page: { flex: 1, backgroundColor: APP_COLORS.pageBg },
-	chips: { gap: 8, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
+	myQuestions: { paddingHorizontal: 16, paddingTop: 14 },
+	chips: { gap: 8, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
 	chip: {
 		height: 36,
 		paddingHorizontal: 14,
@@ -283,23 +247,6 @@ const styles = StyleSheet.create({
 		backgroundColor: '#FFFFFF',
 	},
 	sortText: { fontSize: 13, fontWeight: '700', color: APP_COLORS.ink },
-	card: {
-		marginHorizontal: 16,
-		padding: 14,
-		borderRadius: 12,
-		borderWidth: 1,
-		borderColor: APP_COLORS.divider,
-		backgroundColor: '#FFFFFF',
-		gap: 6,
-	},
-	cardTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-	pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-	pillText: { fontSize: 11, lineHeight: 16, fontWeight: '700' },
-	cardMeta: { flex: 1, minWidth: 0, fontSize: 12, lineHeight: 16, color: APP_COLORS.inkMuted },
-	cardTitle: { fontSize: 15, lineHeight: 21, fontWeight: '800', color: APP_COLORS.ink },
-	cardBody: { fontSize: 13, lineHeight: 19, color: APP_COLORS.inkMuted },
-	status: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-	statusText: { fontSize: 12, lineHeight: 16, fontWeight: '700' },
 	empty: { alignItems: 'center', paddingHorizontal: 32, paddingVertical: 48, gap: 4 },
 	emptyTitle: { fontSize: 16, lineHeight: 22, fontWeight: '800', color: APP_COLORS.ink },
 	emptyText: { fontSize: 13, lineHeight: 19, textAlign: 'center', color: APP_COLORS.inkMuted },
